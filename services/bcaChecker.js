@@ -131,7 +131,7 @@ async function checkPendingTransactions() {
             // Cari apakah nominal transaksi cocok dengan mutasi masuk KlikBCA
             let matchedBcaTx = null;
             for (const bcaTx of bcaTransactions) {
-              const timeAndAmtMatch = bcaTx.amount === tx.amount && new Date(bcaTx.date) >= new Date(tx.created_at);
+              const timeAndAmtMatch = bcaTx.amount === tx.amount && new Date(bcaTx.date) >= new Date(tx.created_at + ' Z');
               if (timeAndAmtMatch) {
                 // Pastikan RRN ini belum pernah digunakan sebelumnya
                 const alreadyUsed = await database.get('SELECT id FROM transactions WHERE bca_ref = ?', [bcaTx.ref]);
