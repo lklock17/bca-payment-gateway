@@ -27,7 +27,7 @@ fi
 
 # 3. Install Chromium/Puppeteer system dependencies
 echo -e "\n${BLUE}[3/6] Menginstal dependensi sistem untuk Puppeteer/Chromium...${NC}"
-DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::="--force-confold" libnss3 libnspr4 libatk-1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libasound2 libpangocairo-1.0-0 libpango-1.0-0 libcairo2 ca-certificates fonts-liberation
+DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::="--force-confold" unzip tar libnss3 libnspr4 libatk-1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libasound2 libpangocairo-1.0-0 libpango-1.0-0 libcairo2 ca-certificates fonts-liberation
 
 # 4. Install PM2 (Process Manager) secara global
 echo -e "\n${BLUE}[4/6] Menginstal PM2...${NC}"
