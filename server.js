@@ -17,7 +17,13 @@ const logBuffer = [];
 const MAX_LOGS = 100;
 
 function addLog(type, args) {
-  const timestamp = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const timestamp = new Date().toLocaleTimeString('id-ID', { 
+    timeZone: 'Asia/Jakarta', 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    second: '2-digit', 
+    hour12: false 
+  });
   const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ');
   logBuffer.unshift({ timestamp, type, message });
   if (logBuffer.length > MAX_LOGS) {

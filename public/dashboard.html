@@ -874,7 +874,7 @@
             <td>${u.id}</td>
             <td style="font-weight:600; color:#fff;">${u.email}</td>
             <td><span class="badge ${u.role === 'admin' ? 'badge-success' : 'badge-pending'}">${u.role}</span></td>
-            <td>${new Date(u.created_at).toLocaleString('id-ID')}</td>
+            <td>${new Date(u.created_at + ' UTC').toLocaleString('id-ID')}</td>
             <td>
               <div style="display:flex; gap:8px;">
                 <button class="btn btn-secondary btn-sm" onclick="openEditUserModal(${JSON.stringify(u).replace(/"/g, '&quot;')})">Edit</button>
@@ -889,7 +889,7 @@
 
     function createTxRow(tx) {
       const tr = document.createElement('tr');
-      const dateStr = new Date(tx.created_at).toLocaleString('id-ID');
+      const dateStr = new Date(tx.created_at + ' UTC').toLocaleString('id-ID');
       const statusBadge = tx.status === 'success' ? 
         `<span class="badge badge-success">Sukses</span>` : 
         `<span class="badge badge-pending">Pending</span>`;
