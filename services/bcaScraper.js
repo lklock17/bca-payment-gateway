@@ -310,11 +310,31 @@ async function fetchBcaTransactions(email, password) {
         const rrnMatch = col1.match(/RRN:\s*(\d+)/i);
         const rrn = rrnMatch ? rrnMatch[1] : null;
 
-        // Parse exact time (e.g. 22.38 WIB)
+        // Parse exact time (e.g. 22.38 WIB) in Jakarta timezone (UTC+7)
         const timeMatch = col1.match(/(\d{2})[\.:](\d{2})\s*WIB/i);
-        let txDate = new Date(); // Today
+        let txDate = new Date();
         if (timeMatch) {
-          txDate.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+          try {
+            // Get current date components in Asia/Jakarta timezone
+            const jktString = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+            const jktDate = new Date(jktString);
+            
+            // Set hours and minutes based on parsed WIB time
+            jktDate.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+            
+            const year = jktDate.getFullYear();
+            const month = String(jktDate.getMonth() + 1).padStart(2, '0');
+            const day = String(jktDate.getDate()).padStart(2, '0');
+            const hours = String(jktDate.getHours()).padStart(2, '0');
+            const minutes = String(jktDate.getMinutes()).padStart(2, '0');
+            
+            // Construct UTC date correctly using the '+07:00' WIB offset
+            txDate = new Date(`${year}-${month}-${day}T${hours}:${minutes}:00+07:00`);
+          } catch (e) {
+            console.warn('[Scraper] Error parsing WIB time:', e.message);
+            // Fallback to local time set
+            txDate.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+          }
         }
 
         parsedList.push({
