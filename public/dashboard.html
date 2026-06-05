@@ -461,6 +461,18 @@
 
         merchants.forEach(m => {
           const tr = document.createElement('tr');
+
+          let bcaStatusBadge = '';
+          if (m.bca_user) {
+            if (m.bca_status === 'connected') {
+              bcaStatusBadge = `<span class="badge badge-success" style="margin-left: 6px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">BCA: AKTIF</span>`;
+            } else if (m.bca_status === 'cooldown') {
+              bcaStatusBadge = `<span class="badge badge-pending" style="margin-left: 6px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3);">BCA: COOLDOWN</span>`;
+            } else {
+              bcaStatusBadge = `<span class="badge badge-danger" style="margin-left: 6px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">BCA: OFFLINE</span>`;
+            }
+          }
+
           tr.innerHTML = `
             <td style="font-weight:600; color:#fff;">${m.name}</td>
             <td>${m.bca_user || '<em style="color:var(--text-muted)">N/A</em>'}</td>
@@ -478,7 +490,10 @@
                 <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${m.api_key}'); showToast('API Key disalin!')">Salin</button>
               </div>
             </td>
-            <td><span class="badge badge-success">${m.status}</span></td>
+            <td>
+              <span class="badge badge-success">${m.status}</span>
+              ${bcaStatusBadge}
+            </td>
             <td>
               <div style="display:flex; gap:8px;">
                 <button class="btn btn-secondary btn-sm" onclick="openEditMerchantModal(${JSON.stringify(m).replace(/"/g, '&quot;')})">Edit</button>

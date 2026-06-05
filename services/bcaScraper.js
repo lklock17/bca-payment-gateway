@@ -35,6 +35,10 @@ class BcaSession {
     });
     this.page = await this.browser.newPage();
     await this.page.setViewport({ width: 1280, height: 1025 });
+    // Emulate Jakarta Timezone
+    await this.page.emulateTimezone('Asia/Jakarta').catch(e => {
+      console.warn('[Scraper] Failed to set timezone to Asia/Jakarta:', e.message);
+    });
   }
 
   async login() {
@@ -193,17 +197,11 @@ class BcaSession {
       await this.login();
     }
 
-    // 3. Wait up to 10 seconds for the dashboard search/filter button to load if not already visible
+    // 3. Wait up to 10 seconds for the dashboard day/highlight buttons to load if not already visible
     try {
-      await this.page.waitForFunction(() => {
-        const buttons = Array.from(document.querySelectorAll('button'));
-        return buttons.some(btn => {
-          const txt = btn.textContent.trim();
-          return txt.includes('Cari') || txt.includes('Tampilkan') || txt.includes('Filter');
-        });
-      }, { timeout: 10000 });
+      await this.page.waitForSelector('.weekdays button, button.highlight', { timeout: 10000 });
     } catch (err) {
-      console.warn('[Scraper] Dashboard search/filter button did not load within 10s. Forcing page refresh...');
+      console.warn('[Scraper] Dashboard day buttons did not load within 10s. Forcing page refresh...');
       // If the page is stuck, try a quick reload to recover
       await this.page.reload({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
     }
@@ -211,21 +209,22 @@ class BcaSession {
     // 4. Simulate human activity (move mouse, click neutral spot, scroll)
     await this.simulateHumanActivity();
 
-    // 5. Refresh transaction list by clicking "Cari" or "Filter"
+    // 5. Refresh transaction list by clicking the active day button to query new data
     console.log('[Scraper] Refreshing transaction table...');
     await this.page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll('button'));
-      const searchBtn = buttons.find(btn => {
-        const txt = btn.textContent.trim();
-        return txt.includes('Cari') || txt.includes('Tampilkan') || txt.includes('Filter');
-      });
-      if (searchBtn) {
-        searchBtn.click();
+      const highlightBtn = document.querySelector('.weekdays button.highlight, button.highlight');
+      if (highlightBtn) {
+        highlightBtn.click();
+      } else {
+        const dayButtons = document.querySelectorAll('.weekdays button');
+        if (dayButtons.length > 0) {
+          dayButtons[dayButtons.length - 1].click(); // Click last button (Today)
+        }
       }
     }).catch(() => {});
 
     // Wait for data load
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 3000));
 
     try {
       await this.page.screenshot({ path: 'public/screenshot-3-final.png' });
@@ -369,8 +368,22 @@ async function closeAllSessions() {
   }
 }
 
+function getSessionStatus(email) {
+  const session = activeSessions[email];
+  if (!session) return 'disconnected';
+  if (!session.browser) return 'disconnected';
+  
+  const now = Date.now();
+  if (session.consecutiveFailedLogins >= 3 && (now - session.lastLoginAttemptTime) < 300000) {
+    return 'cooldown';
+  }
+  
+  return session.isLoggedIn ? 'connected' : 'disconnected';
+}
+
 module.exports = {
   fetchBcaTransactions,
   closeSession,
-  closeAllSessions
+  closeAllSessions,
+  getSessionStatus
 };

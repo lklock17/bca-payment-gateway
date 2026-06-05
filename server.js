@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const database = require('./database');
 const qrisUtil = require('./utils/qris');
 const checkerService = require('./services/bcaChecker');
+const bcaScraper = require('./services/bcaScraper');
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -191,8 +192,19 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
 app.get('/api/merchants', authenticateToken, async (req, res) => {
   try {
     const merchants = await database.all('SELECT id, name, bca_user, bca_pass, static_qris, status, api_key, created_at FROM merchants');
-    res.json(merchants);
+    
+    // Attach session status to each merchant
+    const merchantsWithStatus = merchants.map(m => {
+      let bcaStatus = 'disconnected';
+      if (m.bca_user) {
+        bcaStatus = bcaScraper.getSessionStatus(m.bca_user);
+      }
+      return { ...m, bca_status: bcaStatus };
+    });
+    
+    res.json(merchantsWithStatus);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Gagal mengambil data merchant' });
   }
 });
