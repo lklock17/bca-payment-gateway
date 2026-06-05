@@ -15,6 +15,8 @@ class BcaSession {
     this.browser = null;
     this.page = null;
     this.isLoggedIn = false;
+    this.consecutiveFailedLogins = 0;
+    this.lastLoginAttemptTime = 0;
   }
 
   async launch() {
@@ -36,6 +38,14 @@ class BcaSession {
   }
 
   async login() {
+    const now = Date.now();
+    // Cooldown check: if failed 3+ times, only retry once every 5 minutes (300,000 ms)
+    if (this.consecutiveFailedLogins >= 3 && (now - this.lastLoginAttemptTime) < 300000) {
+      const remainingSecs = Math.ceil((300000 - (now - this.lastLoginAttemptTime)) / 1000);
+      throw new Error(`Login suspended due to 3+ consecutive failures. Retrying in ${remainingSecs} seconds.`);
+    }
+
+    this.lastLoginAttemptTime = now;
     console.log(`[Scraper] Navigating to https://qr.klikbca.com/ ...`);
     await this.page.goto('https://qr.klikbca.com/', { waitUntil: 'networkidle2', timeout: 30000 });
 
@@ -91,13 +101,35 @@ class BcaSession {
     // Wait 7 seconds for login reaction/navigation
     await new Promise(r => setTimeout(r, 7000));
 
-    // Check if login failed
-    const pageText = await this.page.evaluate(() => document.body.innerText);
-    if (pageText.includes('salah') || pageText.includes('incorrect') || pageText.includes('Gagal')) {
-      throw new Error('Login failed: Kredensial salah atau diblokir.');
+    // Check if login failed (either by error text or because we are still on the login page)
+    const loginFormExists = await this.page.evaluate(() => {
+      return !!document.querySelector('input[type="email"], input[formcontrolname="username"], input[name="username"]');
+    });
+
+    if (loginFormExists) {
+      this.consecutiveFailedLogins++;
+      // Extract any visible error message on the page
+      const errorMsg = await this.page.evaluate(() => {
+        const errorElements = document.querySelectorAll('.alert, .text-danger, .error-message, [class*="error"], [class*="alert"]');
+        for (const el of errorElements) {
+          const text = el.innerText.trim();
+          if (text) return text;
+        }
+        const bodyText = document.body.innerText;
+        const lines = bodyText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        for (const line of lines) {
+          if (line.includes('salah') || line.includes('incorrect') || line.includes('gagal') || line.includes('tidak valid') || line.includes('captcha') || line.includes('wajib')) {
+            return line;
+          }
+        }
+        return 'Still on login page (possibly invalid credentials, captcha required, or blocked)';
+      });
+
+      throw new Error(`Login failed: ${errorMsg}`);
     }
 
     this.isLoggedIn = true;
+    this.consecutiveFailedLogins = 0; // Reset on success
     console.log('[Scraper] Login successful.');
   }
 
@@ -131,8 +163,8 @@ class BcaSession {
   async refreshAndFetch() {
     // 1. Check current URL and page content to determine session state
     const sessionCheck = await this.page.evaluate(() => {
-      // Is there an email/login input?
-      if (document.querySelector('input[type="email"], input[formcontrolname="username"]')) {
+      // Is there an email/login/password input?
+      if (document.querySelector('input[type="email"], input[type="password"], input[formcontrolname="username"], input[name="username"]')) {
         return 'login_page';
       }
       
@@ -236,6 +268,15 @@ async function fetchBcaTransactions(email, password) {
   if (!session) {
     session = new BcaSession(email, password);
     activeSessions[email] = session;
+  } else {
+    // If password changed, update it and reset failed login count so they can try again immediately
+    if (session.password !== password) {
+      console.log(`[Scraper] Credentials updated for ${email}. Resetting session status...`);
+      session.password = password;
+      session.consecutiveFailedLogins = 0;
+      session.lastLoginAttemptTime = 0;
+      session.isLoggedIn = false;
+    }
   }
 
   try {
