@@ -17,6 +17,7 @@ class BcaSession {
     this.isLoggedIn = false;
     this.consecutiveFailedLogins = 0;
     this.lastLoginAttemptTime = 0;
+    this.lastLoginError = null;
   }
 
   async launch() {
@@ -51,7 +52,7 @@ class BcaSession {
 
     this.lastLoginAttemptTime = now;
     console.log(`[Scraper] Navigating to https://qr.klikbca.com/ ...`);
-    await this.page.goto('https://qr.klikbca.com/', { waitUntil: 'networkidle2', timeout: 30000 });
+    await this.page.goto('https://qr.klikbca.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     const usernameSelector = 'input[type="email"], input[type="text"], input[formcontrolname="username"], input[name="username"]';
     const passwordSelector = 'input[type="password"], input[formcontrolname="password"], input[name="password"]';
@@ -129,11 +130,13 @@ class BcaSession {
         return 'Still on login page (possibly invalid credentials, captcha required, or blocked)';
       });
 
+      this.lastLoginError = errorMsg;
       throw new Error(`Login failed: ${errorMsg}`);
     }
 
     this.isLoggedIn = true;
     this.consecutiveFailedLogins = 0; // Reset on success
+    this.lastLoginError = null;
     console.log('[Scraper] Login successful.');
   }
 
@@ -193,7 +196,7 @@ class BcaSession {
       this.isLoggedIn = false;
       
       // Navigate to home page to get a clean login form
-      await this.page.goto('https://qr.klikbca.com/', { waitUntil: 'networkidle2', timeout: 30000 });
+      await this.page.goto('https://qr.klikbca.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
       await this.login();
     }
 
@@ -349,6 +352,9 @@ async function fetchBcaTransactions(email, password) {
 
   } catch (err) {
     console.error(`[Scraper] Session error for ${email}:`, err.message);
+    if (session) {
+      session.lastLoginError = err.message;
+    }
     
     // Check if the browser is still alive and responsive
     const isBrowserAlive = session.browser && typeof session.browser.connected === 'boolean' ? session.browser.connected : false;
@@ -360,7 +366,7 @@ async function fetchBcaTransactions(email, password) {
       // Try to navigate to home page in background so it starts fresh next time
       try {
         if (session.page) {
-          await session.page.goto('https://qr.klikbca.com/', { waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {});
+          await session.page.goto('https://qr.klikbca.com/', { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
         }
       } catch (e) {
         console.warn(`[Scraper] Could not return page to home URL:`, e.message);
@@ -390,15 +396,19 @@ async function closeAllSessions() {
 
 function getSessionStatus(email) {
   const session = activeSessions[email];
-  if (!session) return 'disconnected';
-  if (!session.browser) return 'disconnected';
+  if (!session) return { status: 'disconnected', error: null };
+  if (!session.browser) return { status: 'disconnected', error: 'Browser belum dimulai' };
   
   const now = Date.now();
   if (session.consecutiveFailedLogins >= 3 && (now - session.lastLoginAttemptTime) < 300000) {
-    return 'cooldown';
+    const remainingSecs = Math.ceil((300000 - (now - session.lastLoginAttemptTime)) / 1000);
+    return { status: 'cooldown', error: `Login ditangguhkan (${remainingSecs}s). ${session.lastLoginError || ''}`.trim() };
   }
   
-  return session.isLoggedIn ? 'connected' : 'disconnected';
+  return { 
+    status: session.isLoggedIn ? 'connected' : 'disconnected', 
+    error: session.isLoggedIn ? null : (session.lastLoginError || 'Belum login/kredensial salah')
+  };
 }
 
 module.exports = {
