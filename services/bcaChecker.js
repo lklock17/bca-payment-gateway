@@ -73,12 +73,18 @@ async function markTransactionSuccess(txId, bcaRef = null) {
 
 // Map to track the last keep-alive check for each merchant (merchantId -> timestamp)
 const lastPollTimes = {};
+let isChecking = false;
 
 /**
  * Core polling logic to check pending transactions against BCA Merchant accounts.
  * Keeps browser sessions running 24/7 (standby) and runs a 2-minute keep-alive for idle merchants.
  */
 async function checkPendingTransactions() {
+  if (isChecking) {
+    console.log('[Checker] A polling cycle is already active. Skipping this run.');
+    return;
+  }
+  isChecking = true;
   try {
     // 1. Dapatkan daftar seluruh merchant yang aktif
     const merchants = await database.all("SELECT * FROM merchants WHERE status = 'active'");
@@ -146,6 +152,8 @@ async function checkPendingTransactions() {
     }
   } catch (err) {
     console.error('[Checker] Error during polling cycle:', err);
+  } finally {
+    isChecking = false;
   }
 }
 

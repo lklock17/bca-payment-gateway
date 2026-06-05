@@ -18,6 +18,7 @@ class BcaSession {
     this.consecutiveFailedLogins = 0;
     this.lastLoginAttemptTime = 0;
     this.lastLoginError = null;
+    this.isProcessing = false;
   }
 
   async launch() {
@@ -281,6 +282,13 @@ async function fetchBcaTransactions(email, password) {
     }
   }
 
+  if (session.isProcessing) {
+    console.log(`[Scraper] Fetch already in progress for ${email}. Skipping concurrent call.`);
+    return [];
+  }
+
+  session.isProcessing = true;
+
   try {
     // Open browser and log in if not already active
     if (!session.browser) {
@@ -377,6 +385,10 @@ async function fetchBcaTransactions(email, password) {
       delete activeSessions[email];
     }
     return [];
+  } finally {
+    if (session) {
+      session.isProcessing = false;
+    }
   }
 }
 
