@@ -145,10 +145,16 @@
       <section id="merchantsTab" class="tab-section">
         <div class="row-header">
           <h3>Konfigurasi Akun Merchant</h3>
-          <button class="btn btn-primary" onclick="openAddMerchantModal()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Tambah Merchant
-          </button>
+          <div style="display: flex; gap: 12px;">
+            <button class="btn btn-secondary" onclick="loadMerchants()" style="padding: 10px 18px; font-size: 0.9rem;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              Refresh Status
+            </button>
+            <button class="btn btn-primary" onclick="openAddMerchantModal()" style="padding: 10px 18px; font-size: 0.9rem;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Tambah Merchant
+            </button>
+          </div>
         </div>
 
         <div class="glass-panel" style="padding: 24px;">
@@ -360,6 +366,41 @@
       }, 3000);
     }
 
+    // Copy to Clipboard (Supports Secure and Insecure HTTP contexts)
+    function copyToClipboard(text, successMsg = 'API Key disalin!') {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(successMsg);
+        }).catch(err => {
+          fallbackCopyText(text, successMsg);
+        });
+      } else {
+        fallbackCopyText(text, successMsg);
+      }
+    }
+
+    function fallbackCopyText(text, successMsg) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          showToast(successMsg);
+        } else {
+          console.error('Fallback copy was unsuccessful');
+        }
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+      }
+      document.body.removeChild(textArea);
+    }
+
     // Tab switcher
     let currentTab = 'overview';
     const sidebarItems = document.querySelectorAll('.sidebar-item');
@@ -487,7 +528,7 @@
                 <span class="qr-payload-box" style="padding:4px 8px; border-radius:4px; max-height:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px; margin-bottom:0;">
                   ${m.api_key}
                 </span>
-                <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${m.api_key}'); showToast('API Key disalin!')">Salin</button>
+                <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${m.api_key}')">Salin</button>
               </div>
             </td>
             <td>
@@ -669,8 +710,7 @@
     }
 
     function copyQrPayload() {
-      navigator.clipboard.writeText(activeQrPayload);
-      showToast('Payload QRIS disalin ke clipboard!');
+      copyToClipboard(activeQrPayload, 'Payload QRIS disalin ke clipboard!');
     }
 
     // Forms Submission handlers
