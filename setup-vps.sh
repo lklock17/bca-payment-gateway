@@ -13,21 +13,21 @@ echo -e "${BLUE}=== Memulai Setup BCA Payment Gateway di VPS ===${NC}"
 
 # 1. Update sistem
 echo -e "\n${BLUE}[1/5] Memperbarui paket sistem...${NC}"
-apt-get update -y && apt-get upgrade -y
+DEBIAN_FRONTEND=noninteractive apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::="--force-confold"
 
 # 2. Install Curl dan Node.js (v20.x)
-echo -e "\n${BLUE}[2/5] Menginstal Node.js dan npm...${NC}"
+echo -e "\n${BLUE}[2/6] Menginstal Node.js dan npm...${NC}"
 if ! command -v node &> /dev/null; then
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::="--force-confold" nodejs
     echo -e "${GREEN}Node.js berhasil diinstal: $(node -v)${NC}"
 else
     echo -e "${GREEN}Node.js sudah terinstal: $(node -v)${NC}"
 fi
 
 # 3. Install Chromium/Puppeteer system dependencies
-echo -e "\n${BLUE}[3/5] Menginstal dependensi sistem untuk Puppeteer/Chromium...${NC}"
-apt-get install -y libnss3 libnspr4 libatk-1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libasound2 libpangocairo-1.0-0 libpango-1.0-0 libcairo2 ca-certificates fonts-liberation
+echo -e "\n${BLUE}[3/6] Menginstal dependensi sistem untuk Puppeteer/Chromium...${NC}"
+DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::="--force-confold" libnss3 libnspr4 libatk-1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libasound2 libpangocairo-1.0-0 libpango-1.0-0 libcairo2 ca-certificates fonts-liberation
 
 # 4. Install PM2 (Process Manager) secara global
 echo -e "\n${BLUE}[4/6] Menginstal PM2...${NC}"
