@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dokumentasi API - BCA Payment Gateway</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* Documentation specific layout adjustments */
+    .docs-wrapper {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 40px;
+    }
+    
+    .docs-sidebar {
+      position: sticky;
+      top: 40px;
+      height: fit-content;
+      padding: 24px;
+    }
+
+    .docs-nav {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .docs-nav-item a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: var(--transition);
+      display: block;
+      padding: 8px 12px;
+      border-radius: 6px;
+    }
+
+    .docs-nav-item a:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .docs-nav-item.active a {
+      color: #fff;
+      background: rgba(37, 99, 235, 0.15);
+      border-left: 3px solid var(--accent-color);
+    }
+
+    .docs-section {
+      margin-bottom: 64px;
+    }
+
+    .docs-section h2 {
+      font-size: 1.8rem;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      color: #fff;
+    }
+
+    .docs-section h3 {
+      font-size: 1.3rem;
+      margin-top: 32px;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .endpoint-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin-right: 12px;
+    }
+
+    .badge-post {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-get {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .endpoint-url {
+      font-family: monospace;
+      font-size: 1.05rem;
+      color: #f8fafc;
+      vertical-align: middle;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+    }
+
+    .params-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 0.9rem;
+    }
+
+    .params-table th, .params-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .params-table th {
+      background: rgba(15, 23, 42, 0.5);
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    .param-name {
+      font-family: monospace;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .param-type {
+      color: #3b82f6;
+      font-size: 0.8rem;
+      font-family: monospace;
+    }
+
+    .param-req {
+      color: var(--danger);
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .param-opt {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .code-tabs {
+      display: flex;
+      gap: 8px;
+      margin-top: 24px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 8px;
+    }
+
+    .code-tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 6px;
+      transition: var(--transition);
+    }
+
+    .code-tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .code-tab-btn.active {
+      color: #fff;
+      background: var(--accent-color);
+    }
+
+    .code-container {
+      position: relative;
+    }
+
+    .code-block {
+      display: none;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--card-border);
+      border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
+      padding: 20px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      color: #e2e8f0;
+      max-height: 450px;
+    }
+
+    .code-block.active {
+      display: block;
+    }
+
+    .copy-code-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      cursor: pointer;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      transition: var(--transition);
+      z-index: 10;
+    }
+
+    .copy-code-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .header-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 40px;
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(11, 21, 40, 0.8);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font-title);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #fff;
+      text-decoration: none;
+    }
+
+    .header-logo svg {
+      width: 32px;
+      height: 32px;
+      fill: var(--accent-color);
+    }
+
+    @media (max-width: 900px) {
+      .docs-wrapper {
+        grid-template-columns: 1fr;
+      }
+      .docs-sidebar {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Navigation Header -->
+  <header class="header-nav">
+    <a href="/" class="header-logo">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/>
+      </svg>
+      <span>BCA Gateway</span>
+    </a>
+    <div>
+      <a href="/index.html" class="btn btn-secondary btn-sm" style="font-size: 0.9rem;">
+        Masuk Dashboard
+      </a>
+    </div>
+  </header>
+
+  <div class="docs-wrapper">
+    <!-- Left Sidebar Nav -->
+    <aside class="glass-panel docs-sidebar">
+      <h4 style="margin-bottom: 16px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Dokumentasi</h4>
+      <ul class="docs-nav">
+        <li class="docs-nav-item active"><a href="#pengenalan">Pengenalan</a></li>
+        <li class="docs-nav-item"><a href="#autentikasi">Autentikasi</a></li>
+        <li class="docs-nav-item"><a href="#charge-api">Charge API (Buat QRIS)</a></li>
+        <li class="docs-nav-item"><a href="#status-api">Status API</a></li>
+        <li class="docs-nav-item"><a href="#webhook-callback">Webhook Callback</a></li>
+        <li class="docs-nav-item"><a href="#contoh-kode">Contoh Integrasi</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Docs Content -->
+    <main>
+      <!-- SECTION: Introduction -->
+      <section id="pengenalan" class="docs-section">
+        <h2>Pengenalan</h2>
+        <p style="color: var(--text-secondary); font-size: 1.05rem; margin-bottom: 16px;">
+          Selamat datang di **BCA Payment Gateway API**. Gateway pembayaran mandiri ini memungkinkan website e-commerce atau aplikasi toko online Anda untuk memproses pembayaran QRIS secara langsung menggunakan akun KlikBCA Merchant Anda.
+        </p>
+        <p style="color: var(--text-secondary); font-size: 1.05rem;">
+          Alur kerja sistem ini sangat sederhana:
+        </p>
+        <ol style="margin-left: 20px; margin-top: 12px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px;">
+          <li>Aplikasi toko online Anda mengirimkan nominal belanja ke API ini.</li>
+          <li>API menambahkan kode unik nominal kecil (sebagai <strong>fee/suffix</strong> antara 1-199 rupiah) untuk keperluan verifikasi.</li>
+          <li>API memodifikasi QRIS statis merchant Anda menjadi QRIS dinamis ber-nominal secara offline dan mengembalikan gambar QR code.</li>
+          <li>Pembeli memindai QRIS dan melakukan pembayaran.</li>
+          <li>Sistem standby scraper kami mendeteksi mutasi masuk di rekening KlikBCA secara real-time dan mencocokkan nominal transaksi secara otomatis.</li>
+          <li>API mengirimkan webhook instan ke url toko online Anda untuk mengonfirmasi pembayaran sukses.</li>
+        </ol>
+      </section>
+
+      <!-- SECTION: Authentication -->
+      <section id="autentikasi" class="docs-section">
+        <h2>Autentikasi</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Setiap request ke endpoint API ini harus melampirkan **API Key** yang valid dalam header HTTP request sebagai **Bearer Token**.
+        </p>
+        <p style="color: var(--text-secondary); margin-bottom: 24px;">
+          API Key didapatkan dari halaman Dashboard Admin setelah Anda menambahkan Akun BCA Merchant Anda.
+        </p>
+        <div class="glass-panel" style="padding: 20px; border-left: 4px solid var(--accent-color);">
+          <strong style="color: #fff; display: block; margin-bottom: 8px;">Format Header Otorisasi:</strong>
+          <code style="font-family: monospace; font-size: 0.95rem; color: #60a5fa; background: rgba(0,0,0,0.4); padding: 6px 12px; border-radius: 4px; display: block; word-break: break-all;">
+            Authorization: Bearer BCA-GW-YOUR_MERCHANT_API_KEY
+          </code>
+        </div>
+      </section>
+
+      <!-- SECTION: Charge API -->
+      <section id="charge-api" class="docs-section">
+        <h2>Charge API (Buat Invoice QRIS)</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 24px;">
+          Gunakan endpoint ini untuk membuat invoice pembayaran baru. API akan mengembalikan payload data QRIS dinamis beserta gambar barcode Base64.
+        </p>
+
+        <div style="margin-bottom: 24px;">
+          <span class="endpoint-badge badge-post">POST</span>
+          <span class="endpoint-url">/api/v1/charge</span>
+        </div>
+
+        <h4 style="margin-top: 24px; color: #fff;">Parameter Body (JSON)</h4>
+        <table class="params-table">
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Tipe</th>
+              <th>Status</th>
+              <th>Deskripsi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">external_id</td>
+              <td class="param-type">String</td>
+              <td class="param-req">Wajib</td>
+              <td>ID unik transaksi dari sistem toko online Anda (contoh: ORDER-100249).</td>
+            </tr>
+            <tr>
+              <td class="param-name">amount</td>
+              <td class="param-type">Number</td>
+              <td class="param-req">Wajib</td>
+              <td>Nominal dasar pembayaran. Harus bernilai positif dan bulat.</td>
+            </tr>
+            <tr>
+              <td class="param-name">webhook_url</td>
+              <td class="param-type">String</td>
+              <td class="param-opt">Opsional</td>
+              <td>URL callback di server Anda yang akan dikirimi notifikasi sukses otomatis.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4 style="margin-top: 32px; color: #fff;">Respons Payload (JSON) - 201 Created</h4>
+        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
+          API akan menambahkan suffix nominal acak (1-199 rupiah) yang disimpan dalam variabel <code>fee</code> untuk membedakan transaksi nominal kembar. Jumlah akhir yang harus dibayar adalah total dari <code>amount</code> (amount + fee).
+        </p>
+        <pre class="code-block active" style="border-radius: var(--border-radius-md);">{
+  "status": "pending",
+  "transaction_id": 18,
+  "external_id": "ORDER-100249",
+  "amount": 10103,
+  "base_amount": 10000,
+  "fee": 103,
+  "qris_string": "0002010102125144...",
+  "qris_image": "data:image/png;base64,iVBORw0KGgo...",
+  "created_at": "2026-06-05T14:53:45.000Z"
+}</pre>
+      </section>
+
+      <!-- SECTION: Status API -->
+      <section id="status-api" class="docs-section">
+        <h2>Status API (Cek Pembayaran)</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 24px;">
+          Gunakan endpoint ini untuk melakukan pengecekan manual status transaksi dari backend Anda secara berkala (*polling*).
+        </p>
+
+        <div style="margin-bottom: 24px;">
+          <span class="endpoint-badge badge-get">GET</span>
+          <span class="endpoint-url">/api/v1/status/:external_id</span>
+        </div>
+
+        <h4 style="margin-top: 32px; color: #fff;">Respons Payload (JSON) - 200 OK</h4>
+        <pre class="code-block active" style="border-radius: var(--border-radius-md);">{
+  "external_id": "ORDER-100249",
+  "status": "success",
+  "amount": 10103,
+  "created_at": "2026-06-05T14:53:45.000Z",
+  "updated_at": "2026-06-05T14:55:00.000Z"
+}</pre>
+      </section>
+
+      <!-- SECTION: Webhook Callback -->
+      <section id="webhook-callback" class="docs-section">
+        <h2>Webhook Callback</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Ketika pembeli menyelesaikan transaksi dan scraper berhasil mencocokkan mutasi rekening, gateway akan mengirimkan HTTP POST request berisi detail pembayaran ke URL <code>webhook_url</code> yang dikonfigurasi saat membuat charge.
+        </p>
+        <p style="color: var(--text-secondary); margin-bottom: 24px;">
+          Sistem akan mengulangi pengiriman webhook hingga 3 kali dengan jeda waktu 2 detik jika server Anda mengembalikan respons selain HTTP 200 OK.
+        </p>
+
+        <h4 style="color: #fff; margin-bottom: 12px;">Payload Webhook Callback (JSON)</h4>
+        <pre class="code-block active" style="border-radius: var(--border-radius-md);">{
+  "transaction_id": 18,
+  "external_id": "ORDER-100249",
+  "amount": 10103,
+  "status": "success",
+  "updated_at": "2026-06-05T14:55:00.000Z"
+}</pre>
+      </section>
+
+      <!-- SECTION: Code Examples -->
+      <section id="contoh-kode" class="docs-section">
+        <h2>Contoh Integrasi Kode</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Gunakan contoh snippet kode berikut untuk mengintegrasikan toko online Anda dengan gateway pembayaran ini.
+        </p>
+
+        <!-- Code Tabs -->
+        <div class="code-tabs">
+          <button class="code-tab-btn active" onclick="switchCode('curl')">cURL</button>
+          <button class="code-tab-btn" onclick="switchCode('php')">PHP</button>
+          <button class="code-tab-btn" onclick="switchCode('nodejs')">NodeJS</button>
+        </div>
+
+        <div class="code-container">
+          <!-- CURL CODE -->
+          <div class="code-block active" id="code-curl">
+            <button class="copy-code-btn" onclick="copySnippet('code-curl-content')">Salin</button>
+            <span id="code-curl-content"># Membuat invoice transaksi
+curl -X POST http://IP_VPS_ANDA:3005/api/v1/charge \
+  -H "Authorization: Bearer BCA-GW-YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "external_id": "ORDER-100249",
+    "amount": 10000,
+    "webhook_url": "https://website-anda.com/webhook"
+  }'
+
+# Memeriksa status transaksi
+curl -X GET http://IP_VPS_ANDA:3005/api/v1/status/ORDER-100249 \
+  -H "Authorization: Bearer BCA-GW-YOUR_API_KEY"</span>
+          </div>
+
+          <!-- PHP CODE -->
+          <div class="code-block" id="code-php">
+            <button class="copy-code-btn" onclick="copySnippet('code-php-content')">Salin</button>
+            <span id="code-php-content">&lt;?php
+// Contoh Request Charge API di PHP
+$url = "http://IP_VPS_ANDA:3005/api/v1/charge";
+$apiKey = "BCA-GW-YOUR_API_KEY";
+
+$payload = [
+    "external_id" => "ORDER-100249",
+    "amount" => 10000,
+    "webhook_url" => "https://website-anda.com/webhook"
+];
+
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    "Authorization: Bearer " . $apiKey,
+    "Content-Type: application/json"
+]);
+
+$response = curl_exec($ch);
+curl_close($ch);
+
+$data = json_decode($response, true);
+if (isset($data['qris_image'])) {
+    // Tampilkan QRIS ke pembeli
+    echo '&lt;img src="' . $data['qris_image'] . '" alt="QRIS" /&gt;';
+}
+?&gt;</span>
+          </div>
+
+          <!-- NODEJS CODE -->
+          <div class="code-block" id="code-nodejs">
+            <button class="copy-code-btn" onclick="copySnippet('code-nodejs-content')">Salin</button>
+            <span id="code-nodejs-content">const axios = require('axios');
+
+async function createCharge() {
+  try {
+    const response = await axios.post('http://IP_VPS_ANDA:3005/api/v1/charge', {
+      external_id: 'ORDER-100249',
+      amount: 10000,
+      webhook_url: 'https://website-anda.com/webhook'
+    }, {
+      headers: {
+        'Authorization': 'Bearer BCA-GW-YOUR_API_KEY',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('Nominal Akhir (+Fee):', response.data.amount);
+    console.log('Base64 QRIS Image:', response.data.qris_image);
+  } catch (error) {
+    console.error('Error creating charge:', error.response ? error.response.data : error.message);
+  }
+}
+
+createCharge();</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    // Code tabs switcher
+    function switchCode(lang) {
+      document.querySelectorAll('.code-tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.code-block').forEach(block => block.classList.remove('active'));
+      
+      const activeBtn = Array.from(document.querySelectorAll('.code-tab-btn')).find(btn => btn.textContent.toLowerCase() === lang);
+      if (activeBtn) activeBtn.classList.add('active');
+      
+      const targetBlock = document.getElementById(`code-${lang}`);
+      if (targetBlock) targetBlock.classList.add('active');
+    }
+
+    // Code copy tool
+    const toastContainer = document.getElementById('toastContainer');
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'toast toast-success';
+      toast.innerHTML = `<div style="font-weight: 500;">${message}</div>`;
+      toastContainer.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 300);
+      }, 2000);
+    }
+
+    function copySnippet(spanId) {
+      const textToCopy = document.getElementById(spanId).innerText;
+      navigator.clipboard.writeText(textToCopy);
+      showToast('Kode disalin ke clipboard!');
+    }
+
+    // Highlighting navigation items on scroll
+    window.addEventListener('DOMContentLoaded', () => {
+      const sections = document.querySelectorAll('.docs-section');
+      const navItems = document.querySelectorAll('.docs-nav-item');
+
+      window.addEventListener('scroll', () => {
+        let current = '';
+        sections.forEach(section => {
+          const sectionTop = section.offsetTop;
+          const sectionHeight = section.clientHeight;
+          if (pageYOffset >= (sectionTop - 150)) {
+            current = section.getAttribute('id');
+          }
+        });
+
+        navItems.forEach(item => {
+          item.classList.remove('active');
+          const href = item.querySelector('a').getAttribute('href');
+          if (href === `#${current}`) {
+            item.classList.add('active');
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

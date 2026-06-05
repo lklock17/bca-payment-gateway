@@ -1,0 +1,11 @@
+node_modules/
+*.db
+gateway.db
+public/*.png
+.env
+.DS_Store
+.idea/
+.vscode/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
