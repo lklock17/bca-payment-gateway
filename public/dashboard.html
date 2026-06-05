@@ -5,6 +5,283 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - BCA Payment Gateway</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* Position toast container higher to avoid overlay with logs bubble */
+    .toast-container {
+      bottom: 90px !important;
+    }
+
+    /* Log Widget Container */
+    .log-widget-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 1500;
+      font-family: var(--font-body);
+    }
+
+    /* Floating Log Bubble Button */
+    .log-bubble-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: var(--bg-secondary);
+      border: 1px solid var(--card-border);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: var(--transition);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      position: relative;
+    }
+
+    .log-bubble-btn:hover {
+      color: #fff;
+      transform: scale(1.05);
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .log-bubble-btn.active {
+      background: var(--accent-color);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.3);
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .log-bubble-btn .notification-badge {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 12px;
+      height: 12px;
+      background-color: var(--danger);
+      border-radius: 50%;
+      border: 2px solid var(--bg-primary);
+      display: none;
+    }
+
+    /* Logs Panel */
+    .log-panel {
+      position: fixed;
+      bottom: 90px;
+      right: 24px;
+      width: 420px;
+      height: 520px;
+      max-width: calc(100vw - 48px);
+      max-height: calc(100vh - 130px);
+      display: flex;
+      flex-direction: column;
+      z-index: 1499;
+      transform: translateY(20px) scale(0.95);
+      opacity: 0;
+      pointer-events: none;
+      transition: var(--transition);
+      overflow: hidden;
+    }
+
+    .log-panel.active {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* Logs Header */
+    .log-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(15, 23, 42, 0.6);
+    }
+
+    .log-header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .log-live-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--success);
+      font-weight: 500;
+      background: rgba(16, 185, 129, 0.1);
+      padding: 2px 8px;
+      border-radius: 12px;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .log-live-dot {
+      width: 6px;
+      height: 6px;
+      background-color: var(--success);
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.8); opacity: 0.5; }
+      50% { transform: scale(1.2); opacity: 1; }
+      100% { transform: scale(0.8); opacity: 0.5; }
+    }
+
+    .log-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .log-action-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+    }
+
+    .log-action-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    /* Log Search Utility */
+    .log-search-container {
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(15, 23, 42, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .log-search-input {
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      width: 100%;
+      outline: none;
+    }
+
+    .log-search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    /* Logs Body (Scrollable terminal) */
+    .log-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      background: rgba(3, 7, 18, 0.95);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+
+    /* Custom Scrollbar for Logs */
+    .log-body::-webkit-scrollbar {
+      width: 6px;
+    }
+    .log-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .log-body::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+    .log-body::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Individual Log Entries */
+    .log-entry {
+      display: flex;
+      gap: 8px;
+      word-break: break-word;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+      padding-bottom: 4px;
+    }
+
+    .log-entry-time {
+      color: var(--text-muted);
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .log-entry-badge {
+      flex-shrink: 0;
+      font-weight: bold;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      border-radius: 3px;
+      padding: 0 4px;
+      user-select: none;
+    }
+
+    .log-entry-info {
+      color: #e2e8f0;
+    }
+    .log-entry-info .log-entry-badge {
+      background: rgba(96, 165, 250, 0.15);
+      color: #60a5fa;
+    }
+
+    .log-entry-warn {
+      color: #fde047;
+    }
+    .log-entry-warn .log-entry-badge {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+    }
+
+    .log-entry-error {
+      color: #fca5a5;
+    }
+    .log-entry-error .log-entry-badge {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
+
+    /* Logs Footer */
+    .log-footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--card-border);
+      background: rgba(15, 23, 42, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .log-footer-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+  </style>
 </head>
 <body>
   <div class="dashboard-wrapper">
@@ -820,8 +1097,201 @@
       }).format(number);
     }
 
+    // Logs Widget Functionality
+    let logPollInterval = null;
+    let cachedLogs = [];
+    let isPanelOpen = false;
+    let hasUnreadAlerts = false;
+    let lastFetchedLogTimestamp = null;
+
+    async function fetchLogs() {
+      try {
+        const res = await apiRequest('/api/logs');
+        if (res && res.ok) {
+          const logs = await res.json();
+          if (logs.length > 0) {
+            const newestLog = logs[0];
+            const newestTimeStr = newestLog.timestamp + '_' + newestLog.message;
+            
+            if (newestTimeStr !== lastFetchedLogTimestamp) {
+              if (!isPanelOpen && lastFetchedLogTimestamp !== null) {
+                for (const entry of logs) {
+                  const entryKey = entry.timestamp + '_' + entry.message;
+                  if (entryKey === lastFetchedLogTimestamp) break;
+                  if (entry.type === 'warn' || entry.type === 'error') {
+                    hasUnreadAlerts = true;
+                    document.getElementById('logNotificationBadge').style.display = 'block';
+                    break;
+                  }
+                }
+              }
+              lastFetchedLogTimestamp = newestTimeStr;
+            }
+          }
+
+          cachedLogs = logs;
+          renderLogs();
+          document.getElementById('logStatusText').innerText = `Terakhir: ${new Date().toLocaleTimeString('id-ID')}`;
+        }
+      } catch (err) {
+        console.error('Gagal mengambil log:', err);
+      }
+    }
+
+    function renderLogs() {
+      const logBody = document.getElementById('logBody');
+      const searchVal = document.getElementById('logSearchInput').value.toLowerCase();
+      
+      let logsToRender = [...cachedLogs].reverse();
+      
+      if (searchVal) {
+        logsToRender = logsToRender.filter(log => 
+          log.message.toLowerCase().includes(searchVal) || 
+          log.type.toLowerCase().includes(searchVal) ||
+          log.timestamp.includes(searchVal)
+        );
+      }
+      
+      if (logsToRender.length === 0) {
+        logBody.innerHTML = `<div style="color: var(--text-muted); text-align: center; margin-top: 20px;">Tidak ada log yang cocok</div>`;
+        return;
+      }
+      
+      logBody.innerHTML = logsToRender.map(log => {
+        const badgeText = log.type === 'info' ? 'info' : log.type === 'warn' ? 'warn' : 'err';
+        return `
+          <div class="log-entry log-entry-${log.type}">
+            <span class="log-entry-time">[${log.timestamp}]</span>
+            <span class="log-entry-badge">${badgeText}</span>
+            <span class="log-entry-msg">${escapeHtml(log.message)}</span>
+          </div>
+        `;
+      }).join('');
+      
+      if (document.getElementById('logAutoScroll').checked) {
+        logBody.scrollTop = logBody.scrollHeight;
+      }
+    }
+
+    function toggleLogPanel() {
+      const logPanel = document.getElementById('logPanel');
+      const logBubbleBtn = document.getElementById('logBubbleBtn');
+      const badge = document.getElementById('logNotificationBadge');
+      
+      isPanelOpen = !isPanelOpen;
+      
+      if (isPanelOpen) {
+        logPanel.classList.add('active');
+        logBubbleBtn.classList.add('active');
+        badge.style.display = 'none';
+        hasUnreadAlerts = false;
+        
+        fetchLogs();
+        clearInterval(logPollInterval);
+        logPollInterval = setInterval(fetchLogs, 3000);
+      } else {
+        logPanel.classList.remove('active');
+        logBubbleBtn.classList.remove('active');
+        
+        clearInterval(logPollInterval);
+        logPollInterval = setInterval(fetchLogs, 15000);
+      }
+    }
+
+    function clearLocalLogs() {
+      cachedLogs = [];
+      renderLogs();
+    }
+
+    function filterLocalLogs() {
+      renderLogs();
+    }
+
+    function escapeHtml(text) {
+      const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      };
+      return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
     // Initial Load
     loadTabChunks();
+    
+    // Start background slow polling for logs
+    fetchLogs();
+    logPollInterval = setInterval(fetchLogs, 15000);
   </script>
+
+  <!-- Floating Log Bubble & Panel -->
+  <div class="log-widget-container">
+    <!-- Bubble Button -->
+    <button class="log-bubble-btn" id="logBubbleBtn" onclick="toggleLogPanel()" title="Tampilkan Log Aktivitas">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 17 10 11 4 5"></polyline>
+        <line x1="12" y1="19" x2="20" y2="19"></line>
+      </svg>
+      <div class="notification-badge" id="logNotificationBadge"></div>
+    </button>
+
+    <!-- Logs Panel -->
+    <div class="glass-panel log-panel" id="logPanel">
+      <!-- Panel Header -->
+      <div class="log-header">
+        <div class="log-header-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-color);">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          <span>Log Aktivitas Sistem</span>
+        </div>
+        <div class="log-live-indicator">
+          <div class="log-live-dot"></div>
+          <span>LIVE</span>
+        </div>
+        <div class="log-actions">
+          <button class="log-action-btn" onclick="clearLocalLogs()" title="Kosongkan Tampilan">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+          <button class="log-action-btn" onclick="toggleLogPanel()" title="Tutup">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Panel Search -->
+      <div class="log-search-container">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted);">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" class="log-search-input" id="logSearchInput" placeholder="Cari log..." oninput="filterLocalLogs()">
+      </div>
+
+      <!-- Panel Body (Console style) -->
+      <div class="log-body" id="logBody">
+        <div style="color: var(--text-muted); text-align: center; margin-top: 20px;">Menghubungkan ke logs stream...</div>
+      </div>
+
+      <!-- Panel Footer -->
+      <div class="log-footer">
+        <label class="log-footer-label">
+          <input type="checkbox" id="logAutoScroll" checked style="accent-color: var(--accent-color);">
+          <span>Auto Scroll</span>
+        </label>
+        <span id="logStatusText">Terakhir diperbarui: -</span>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

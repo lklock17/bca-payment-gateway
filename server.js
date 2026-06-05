@@ -12,6 +12,36 @@ const bcaScraper = require('./services/bcaScraper');
 const app = express();
 const PORT = process.env.PORT || 3005;
 
+// Global Log Buffer for Admin Dashboard Console Widget
+const logBuffer = [];
+const MAX_LOGS = 100;
+
+function addLog(type, args) {
+  const timestamp = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ');
+  logBuffer.unshift({ timestamp, type, message });
+  if (logBuffer.length > MAX_LOGS) {
+    logBuffer.pop();
+  }
+}
+
+const originalLog = console.log;
+const originalWarn = console.warn;
+const originalError = console.error;
+
+console.log = (...args) => {
+  addLog('info', args);
+  originalLog(...args);
+};
+console.warn = (...args) => {
+  addLog('warn', args);
+  originalWarn(...args);
+};
+console.error = (...args) => {
+  addLog('error', args);
+  originalError(...args);
+};
+
 // Token Secret generation
 const JWT_SECRET = crypto.randomBytes(32).toString('hex');
 
@@ -195,11 +225,15 @@ app.get('/api/merchants', authenticateToken, async (req, res) => {
     
     // Attach session status to each merchant
     const merchantsWithStatus = merchants.map(m => {
-      let bcaStatus = 'disconnected';
+      let bcaStatus = { status: 'disconnected', error: null };
       if (m.bca_user) {
         bcaStatus = bcaScraper.getSessionStatus(m.bca_user);
       }
-      return { ...m, bca_status: bcaStatus };
+      return { 
+        ...m, 
+        bca_status: bcaStatus.status, 
+        bca_error: bcaStatus.error 
+      };
     });
     
     res.json(merchantsWithStatus);
@@ -319,6 +353,10 @@ app.get('/api/stats', authenticateToken, async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: 'Gagal menghitung statistik' });
   }
+});
+
+app.get('/api/logs', authenticateToken, (req, res) => {
+  res.json(logBuffer);
 });
 
 // ==========================================
