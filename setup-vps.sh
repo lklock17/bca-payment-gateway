@@ -46,26 +46,29 @@ fi
 echo -e "\n${BLUE}[5/6] Menginstal dependensi aplikasi...${NC}"
 npm install --production
 
-# 6. Konfigurasi Firewall untuk membuka port 3005
+# 6. Konfigurasi Firewall untuk membuka port 80 dan 3005
 echo -e "\n${BLUE}[6/6] Mengatur firewall...${NC}"
 if command -v ufw &> /dev/null; then
+    ufw allow 80/tcp
     ufw allow 3005/tcp
-    echo -e "${GREEN}Port 3005 diizinkan melalui UFW.${NC}"
+    echo -e "${GREEN}Port 80 dan 3005 diizinkan melalui UFW.${NC}"
 else
+    iptables -I INPUT -p tcp --dport 80 -j ACCEPT
     iptables -I INPUT -p tcp --dport 3005 -j ACCEPT
-    echo -e "${GREEN}Port 3005 diizinkan melalui iptables.${NC}"
+    echo -e "${GREEN}Port 80 dan 3005 diizinkan melalui iptables.${NC}"
 fi
 
-# 6. Jalankan aplikasi menggunakan PM2
+# 7. Jalankan aplikasi menggunakan PM2 pada Port 80
 echo -e "\n${BLUE}=== Menjalankan Aplikasi ===${NC}"
+pm2 delete "bca-scraper" 2>/dev/null || true
 pm2 delete "bca-gateway" 2>/dev/null || true
-pm2 start server.js --name "bca-gateway"
+PORT=80 pm2 start server.js --name "bca-gateway"
 pm2 save
 pm2 startup
 
 echo -e "\n${GREEN}=== SETUP SELESAI ===${NC}"
-echo -e "${GREEN}Aplikasi sekarang berjalan di latar belakang VPS!${NC}"
-echo -e "Akses Dashboard melalui browser: ${BLUE}http://<IP_VPS_ANDA>:3005${NC}"
+echo -e "${GREEN}Aplikasi sekarang berjalan di latar belakang VPS pada Port 80!${NC}"
+echo -e "Akses Dashboard melalui browser: ${BLUE}http://<IP_VPS_ANDA>${NC}"
 echo -e "Gunakan akun default berikut:"
 echo -e "  - Email: ${BLUE}admin@gateway.com${NC}"
 echo -e "  - Sandi: ${BLUE}admin123${NC}"
