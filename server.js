@@ -141,6 +141,50 @@ app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) =
   }
 });
 
+app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { email, password, role } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email harus diisi' });
+  }
+
+  try {
+    const user = await database.get('SELECT * FROM users WHERE id = ?', [id]);
+    if (!user) {
+      return res.status(404).json({ message: 'User tidak ditemukan' });
+    }
+
+    // Prevent changing primary admin role
+    if (user.email === 'admin@gateway.com' && role !== 'admin') {
+      return res.status(400).json({ message: 'Akun admin utama harus tetap memiliki role Admin' });
+    }
+
+    // Check if email already taken
+    if (email !== user.email) {
+      const emailExists = await database.get('SELECT id FROM users WHERE email = ? AND id != ?', [email, id]);
+      if (emailExists) {
+        return res.status(400).json({ message: 'Email sudah digunakan oleh user lain' });
+      }
+    }
+
+    let query = 'UPDATE users SET email = ?, role = ? WHERE id = ?';
+    let params = [email, role || 'user', id];
+
+    if (password && password.trim() !== '') {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      query = 'UPDATE users SET email = ?, password = ?, role = ? WHERE id = ?';
+      params = [email, hashedPassword, role || 'user', id];
+    }
+
+    await database.run(query, params);
+    res.json({ message: 'User berhasil diperbarui' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Gagal memperbarui data user' });
+  }
+});
+
 // ==========================================
 // 3. MERCHANT MANAGEMENT
 // ==========================================

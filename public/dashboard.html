@@ -275,20 +275,22 @@
     </div>
   </div>
 
-  <!-- MODAL: Add User -->
+  <!-- MODAL: Add/Edit User -->
   <div class="modal-overlay" id="userModal">
     <div class="glass-panel modal-content">
       <button class="modal-close" onclick="closeUserModal()">×</button>
-      <h3 style="margin-bottom: 24px;">Tambah User Baru</h3>
+      <h3 style="margin-bottom: 24px;" id="userModalTitle">Tambah User Baru</h3>
       
       <form id="userForm">
+        <input type="hidden" id="userId">
         <div class="form-group">
           <label class="form-label" for="userEmail">Alamat Email</label>
           <input type="email" id="userEmail" class="form-control" placeholder="user@gmail.com" required autocomplete="username">
         </div>
         <div class="form-group">
-          <label class="form-label" for="userPassword">Password</label>
-          <input type="password" id="userPassword" class="form-control" placeholder="••••••••" required autocomplete="new-password">
+          <label class="form-label" for="userPassword" id="userPasswordLabel">Password</label>
+          <input type="password" id="userPassword" class="form-control" placeholder="••••••••" autocomplete="new-password">
+          <small style="color: var(--text-muted); font-size: 0.75rem; display: none; margin-top: 4px;" id="userPasswordHelp">Kosongkan jika tidak ingin mengubah password.</small>
         </div>
         <div class="form-group">
           <label class="form-label" for="userRole">Role Akses</label>
@@ -300,7 +302,7 @@
         
         <div style="display: flex; gap: 12px; margin-top: 24px;">
           <button type="button" class="btn btn-secondary btn-block" onclick="closeUserModal()">Batal</button>
-          <button type="submit" class="btn btn-primary btn-block">Tambah</button>
+          <button type="submit" class="btn btn-primary btn-block" id="userSubmitBtn">Tambah</button>
         </div>
       </form>
     </div>
@@ -540,7 +542,10 @@
             <td><span class="badge ${u.role === 'admin' ? 'badge-success' : 'badge-pending'}">${u.role}</span></td>
             <td>${new Date(u.created_at).toLocaleString('id-ID')}</td>
             <td>
-              <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})" ${u.email === 'admin@gateway.com' ? 'disabled' : ''}>Hapus</button>
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-secondary btn-sm" onclick="openEditUserModal(${JSON.stringify(u).replace(/"/g, '&quot;')})">Edit</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})" ${u.email === 'admin@gateway.com' ? 'disabled' : ''}>Hapus</button>
+              </div>
             </td>
           `;
           tbody.appendChild(tr);
@@ -609,6 +614,23 @@
 
     function openAddUserModal() {
       document.getElementById('userForm').reset();
+      document.getElementById('userId').value = '';
+      document.getElementById('userPassword').setAttribute('required', 'required');
+      document.getElementById('userPasswordHelp').style.display = 'none';
+      document.getElementById('userModalTitle').innerText = 'Tambah User Baru';
+      document.getElementById('userSubmitBtn').innerText = 'Tambah';
+      document.getElementById('userModal').classList.add('active');
+    }
+
+    function openEditUserModal(u) {
+      document.getElementById('userForm').reset();
+      document.getElementById('userId').value = u.id;
+      document.getElementById('userEmail').value = u.email;
+      document.getElementById('userRole').value = u.role;
+      document.getElementById('userPassword').removeAttribute('required');
+      document.getElementById('userPasswordHelp').style.display = 'block';
+      document.getElementById('userModalTitle').innerText = 'Edit User';
+      document.getElementById('userSubmitBtn').innerText = 'Simpan';
       document.getElementById('userModal').classList.add('active');
     }
 
@@ -672,22 +694,36 @@
 
     document.getElementById('userForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const id = document.getElementById('userId').value;
       const email = document.getElementById('userEmail').value;
       const password = document.getElementById('userPassword').value;
       const role = document.getElementById('userRole').value;
 
-      const res = await apiRequest('/api/users', {
-        method: 'POST',
+      // Validate password for new users
+      if (!id && (!password || password.trim() === '')) {
+        showToast('Password wajib diisi untuk user baru', 'error');
+        return;
+      }
+
+      let url = '/api/users';
+      let method = 'POST';
+      if (id) {
+        url = `/api/users/${id}`;
+        method = 'PUT';
+      }
+
+      const res = await apiRequest(url, {
+        method: method,
         body: JSON.stringify({ email, password, role })
       });
 
       if (res && res.ok) {
-        showToast('User baru berhasil ditambahkan!');
+        showToast(id ? 'Data user berhasil diperbarui!' : 'User baru berhasil ditambahkan!');
         closeUserModal();
         loadUsers();
       } else {
         const data = await res.json();
-        showToast(data.message || 'Gagal menambahkan user', 'error');
+        showToast(data.message || 'Gagal menyimpan data user', 'error');
       }
     });
 
