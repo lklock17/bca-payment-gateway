@@ -168,8 +168,8 @@ async function generateQRISImage(qrisStr) {
       display: flex;
       justify-content: center;
       align-items: center;
-      width: 350px;
-      height: 270px;
+      width: 220px;
+      height: 240px;
     }
     .container {
       display: flex;
@@ -186,7 +186,7 @@ async function generateQRISImage(qrisStr) {
       font-size: 18px;
       font-weight: bold;
       color: #0c1c30;
-      margin-top: 6px;
+      margin-top: 4px;
       text-align: center;
     }
   </style>
@@ -201,7 +201,7 @@ async function generateQRISImage(qrisStr) {
     `;
 
     const page = await browser.newPage();
-    await page.setViewport({ width: 350, height: 270, deviceScaleFactor: 2 });
+    await page.setViewport({ width: 220, height: 240, deviceScaleFactor: 2 });
     await page.setContent(htmlContent);
 
     // Wait for the QR image to load
