@@ -134,7 +134,7 @@ async function generateQRISImage(qrisStr) {
     rawQr = await QRCode.toDataURL(qrisStr, {
       errorCorrectionLevel: 'M',
       margin: 1,
-      width: 300,
+      width: 200,
       color: {
         dark: '#0A1128',
         light: '#FFFFFF'
@@ -168,8 +168,8 @@ async function generateQRISImage(qrisStr) {
       display: flex;
       justify-content: center;
       align-items: center;
-      width: 330px;
-      height: 360px;
+      width: 350px;
+      height: 270px;
     }
     .container {
       display: flex;
@@ -178,15 +178,15 @@ async function generateQRISImage(qrisStr) {
       justify-content: center;
     }
     .qr-image {
-      width: 300px;
-      height: 300px;
+      width: 200px;
+      height: 200px;
       display: block;
     }
     .merchant-name {
-      font-size: 24px;
+      font-size: 18px;
       font-weight: bold;
       color: #0c1c30;
-      margin-top: 10px;
+      margin-top: 6px;
       text-align: center;
     }
   </style>
@@ -201,7 +201,7 @@ async function generateQRISImage(qrisStr) {
     `;
 
     const page = await browser.newPage();
-    await page.setViewport({ width: 330, height: 360, deviceScaleFactor: 2 });
+    await page.setViewport({ width: 350, height: 270, deviceScaleFactor: 2 });
     await page.setContent(htmlContent);
 
     // Wait for the QR image to load
