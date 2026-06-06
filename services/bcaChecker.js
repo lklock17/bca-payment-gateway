@@ -125,6 +125,7 @@ async function checkPendingTransactions() {
         
         console.log(`[Checker] Polling merchant "${merchant.name}" (Pending: ${hasPending ? 'YA (10s)' : 'TIDAK (1m Keep-Alive)'})...`);
         const bcaTransactions = await bcaScraper.fetchBcaTransactions(merchant.bca_user, merchant.bca_pass);
+        console.log(`[Checker] Scraped transactions count: ${bcaTransactions ? bcaTransactions.length : 0}. Data:`, JSON.stringify(bcaTransactions));
 
         if (hasPending && bcaTransactions && bcaTransactions.length > 0) {
           for (const tx of pendingByMerchant[merchant.id]) {
