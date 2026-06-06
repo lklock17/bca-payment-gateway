@@ -177,12 +177,15 @@ class BcaSession {
       }
       
       // Check for logout/expired indicators in body text
-      const bodyText = document.body.innerText;
-      if (bodyText.includes('Sesi Anda telah berakhir') || 
-          bodyText.includes('Session has expired') || 
+      const bodyText = document.body.innerText.toLowerCase();
+      if (bodyText.includes('sesi anda telah berakhir') || 
+          bodyText.includes('sesi anda telah habis') || 
+          bodyText.includes('session has expired') || 
           bodyText.includes('silakan login') ||
+          bodyText.includes('silahkan login') ||
           bodyText.includes('session timeout') ||
-          bodyText.includes('Sesi berakhir')) {
+          bodyText.includes('sesi berakhir') ||
+          bodyText.includes('koneksi ke qr merchant service bca terputus')) {
         return 'expired';
       }
       
