@@ -320,8 +320,8 @@ async function fetchBcaTransactions(email, password) {
       const isCredit = col2.includes('+');
 
       if (isCredit) {
-        // Parse RRN reference
-        const rrnMatch = col1.match(/RRN:\s*(\d+)/i);
+        // Parse RRN reference (allowing alphanumeric RRNs)
+        const rrnMatch = col1.match(/RRN:\s*([a-zA-Z0-9]+)/i);
         const rrn = rrnMatch ? rrnMatch[1] : null;
 
         // Parse exact time (e.g. 22.38 WIB) in Jakarta timezone (UTC+7)
