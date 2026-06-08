@@ -456,6 +456,10 @@ app.post('/api/v1/charge', authenticateApiKey, async (req, res) => {
 
   try {
     if (method === 'crypto') {
+      if (process.env.ENABLE_CRYPTO === 'false') {
+        return res.status(400).json({ status: 'error', message: 'Metode pembayaran Crypto dinonaktifkan sementara oleh Administrator.' });
+      }
+
       const apiKey = req.merchant.coinbase_api_key;
       const apiSecret = req.merchant.coinbase_webhook_secret;
 
