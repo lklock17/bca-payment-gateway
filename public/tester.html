@@ -123,9 +123,20 @@
               0.00 USDT
             </div>
 
-            <!-- QR Code Alamat Wallet -->
+            <!-- Selector Jaringan untuk QR -->
+            <div class="form-group" style="max-width: 420px; margin: 0 auto 16px auto; text-align: left;">
+              <label class="form-label" style="font-size: 0.8rem; display: block; margin-bottom: 4px; color: var(--text-secondary);">Jaringan USDT (Untuk Scan QR Otomatis):</label>
+              <select id="cryptoNetworkSelect" class="form-control" style="font-size: 0.85rem; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff;">
+                <option value="polygon">Polygon (USDT) - Sangat Direkomendasikan (Fee Murah)</option>
+                <option value="arbitrum">Arbitrum One (USDT) - Direkomendasikan (Fee Murah)</option>
+                <option value="ethereum">Ethereum ERC-20 (USDT) - (Fee Sangat Mahal)</option>
+              </select>
+            </div>
+
+            <!-- QR Code Alamat Wallet (Format EIP-681) -->
             <div style="background: #fff; padding: 12px; border-radius: 8px; display: inline-block; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
               <img id="cryptoQrImg" src="" alt="Crypto Wallet Address QR" style="width: 200px; height: 200px; display: block;">
+              <small style="color: #64748b; font-size: 0.7rem; display: block; margin-top: 4px; font-weight: 500;">Scan QR untuk mengisi Alamat & Nominal otomatis</small>
             </div>
             
             <div class="form-group" style="max-width: 420px; margin: 0 auto 20px auto;">
@@ -142,7 +153,7 @@
               <ol style="margin: 0; padding-left: 20px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 6px;">
                 <li>Buka aplikasi dompet/exchange Anda (seperti <strong>Binance, Trust Wallet, MetaMask, Indodax, Tokocrypto</strong>, dll.).</li>
                 <li>Pilih menu <strong>Kirim / Penarikan (Send / Withdraw)</strong>, lalu pilih koin <strong>USDT</strong>.</li>
-                <li>Pilih jaringan transfer. Anda bebas menggunakan jaringan <strong>ERC-20 (Ethereum), Polygon, atau Arbitrum</strong> (pastikan jaringan di wallet pengirim sama dengan jaringan di tujuan).</li>
+                <li>Pilih jaringan transfer: <strong style="color: #60a5fa;" id="instructionNetworkName">Polygon (USDT)</strong>. Jaringan pengirim di wallet Anda WAJIB sama dengan jaringan tujuan.</li>
                 <li>Masukkan nominal transfer tepat sebesar: <strong style="color: #10b981;"><span id="instructionAmount">0.00</span> USDT</strong> agar transaksi terverifikasi otomatis.</li>
                 <li>Pembayaran Anda akan otomatis terkonfirmasi oleh sistem dalam 1-5 menit setelah dana terdeteksi masuk.</li>
               </ol>
@@ -194,6 +205,53 @@
     // Auto-generate random Order ID
     document.getElementById('externalId').value = 'INV-' + Math.floor(100000 + Math.random() * 900000);
 
+    let currentCryptoData = null;
+
+    function updateCryptoPaymentView() {
+      if (!currentCryptoData) return;
+      
+      const network = document.getElementById('cryptoNetworkSelect').value;
+      const address = currentCryptoData.hosted_url;
+      const amountCrypto = currentCryptoData.amount_crypto;
+      
+      // USDT decimals = 6
+      const amountInAtomic = Math.round(amountCrypto * 1000000);
+      
+      let contractAddress = '';
+      let explorerUrl = '';
+      let networkNameDisplay = '';
+      
+      if (network === 'polygon') {
+        contractAddress = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F';
+        explorerUrl = `https://polygonscan.com/address/${address}`;
+        networkNameDisplay = 'Polygon (USDT)';
+      } else if (network === 'ethereum') {
+        contractAddress = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
+        explorerUrl = `https://etherscan.io/address/${address}`;
+        networkNameDisplay = 'Ethereum ERC-20 (USDT)';
+      } else if (network === 'arbitrum') {
+        contractAddress = '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9';
+        explorerUrl = `https://arbiscan.io/address/${address}`;
+        networkNameDisplay = 'Arbitrum One (USDT)';
+      }
+      
+      // EIP-681 URI format for ERC20 transfer
+      const qrData = `ethereum:${contractAddress}/transfer?address=${address}&uint256=${amountInAtomic}`;
+      
+      // Update QR Code image
+      document.getElementById('cryptoQrImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(qrData)}`;
+      
+      // Update explorer link
+      document.getElementById('coinbasePayBtn').href = explorerUrl;
+      document.getElementById('coinbasePayBtn').querySelector('span').innerText = `Cek Alamat di ${network === 'polygon' ? 'Polygonscan' : network === 'arbitrum' ? 'Arbiscan' : 'Etherscan'}`;
+      
+      // Update instruction details
+      document.getElementById('instructionNetworkName').innerText = networkNameDisplay;
+    }
+
+    // Attach select change listener
+    document.getElementById('cryptoNetworkSelect').addEventListener('change', updateCryptoPaymentView);
+
     const toastContainer = document.getElementById('toastContainer');
     function showToast(message, type = 'success') {
       const toast = document.createElement('div');
@@ -241,11 +299,10 @@
             document.getElementById('cryptoWalletAddress').value = data.hosted_url;
             document.getElementById('instructionAmount').innerText = data.amount_crypto;
 
-            // Generate QR code for the raw wallet address (compatible with all exchanges & wallets)
-            document.getElementById('cryptoQrImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${data.hosted_url}`;
+            // Save data and trigger view update
+            currentCryptoData = data;
+            updateCryptoPaymentView();
             
-            // Link explorer to CoinbasePayBtn (using Etherscan)
-            document.getElementById('coinbasePayBtn').href = `https://etherscan.io/address/${data.hosted_url}`;
             document.getElementById('countdownText').innerText = 'Menunggu pembayaran crypto terdeteksi...';
           } else {
             document.getElementById('qrisSection').style.display = 'block';
