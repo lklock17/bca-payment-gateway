@@ -110,17 +110,32 @@
 
           <!-- Crypto Section -->
           <div id="cryptoSection" style="display: none; padding: 20px 0;">
-            <div style="font-size: 3rem; color: #60a5fa; margin-bottom: 16px;">
+            <div style="font-size: 3rem; color: #60a5fa; margin-bottom: 12px;">
               <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;">
-                <line x1="12" y1="1" x2="12" y2="23"></line>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 6v12M8 10h8M8 14h8"></path>
               </svg>
             </div>
-            <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 20px;">
-              Silakan lakukan pembayaran menggunakan portal pembayaran Coinbase Commerce.
+            <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 8px; font-weight: 500;">
+              Silakan transfer USDT sebesar:
             </p>
+            <div style="font-size: 2.2rem; font-weight: 800; color: #10b981; margin-bottom: 16px; font-family: monospace;" id="cryptoUSDTAmount">
+              0.00 USDT
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 6px;">
+              Jaringan: <strong>Polygon (USDT)</strong>
+            </p>
+            
+            <div class="form-group" style="max-width: 420px; margin: 0 auto 20px auto;">
+              <label class="form-label" style="font-size: 0.8rem; text-align: left; display: block; margin-bottom: 4px;">Alamat Dompet Penerima:</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="cryptoWalletAddress" class="form-control" readonly style="font-family: monospace; font-size: 0.8rem; text-align: center; background: rgba(255,255,255,0.05); color: #fff;">
+                <button type="button" class="btn btn-secondary" id="copyWalletBtn" style="padding: 0 16px; font-size: 0.85rem;">Copy</button>
+              </div>
+            </div>
+
             <a id="coinbasePayBtn" href="#" target="_blank" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; padding:12px 24px; font-weight:600; text-decoration:none; justify-content:center;">
-              <span>Bayar dengan Crypto</span>
+              <span>Cek Alamat di Explorer</span>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
             </a>
           </div>
@@ -206,8 +221,14 @@
           if (payment_method === 'crypto') {
             document.getElementById('qrisSection').style.display = 'none';
             document.getElementById('cryptoSection').style.display = 'block';
-            document.getElementById('coinbasePayBtn').href = data.hosted_url;
-            document.getElementById('countdownText').innerText = 'Menunggu pembayaran via Coinbase Commerce...';
+            
+            // Set USDT amount and wallet address fields
+            document.getElementById('cryptoUSDTAmount').innerText = `${data.amount_crypto} USDT`;
+            document.getElementById('cryptoWalletAddress').value = data.hosted_url;
+            
+            // Link explorer to CoinbasePayBtn
+            document.getElementById('coinbasePayBtn').href = `https://polygonscan.com/address/${data.hosted_url}`;
+            document.getElementById('countdownText').innerText = 'Menunggu pembayaran crypto terdeteksi...';
           } else {
             document.getElementById('qrisSection').style.display = 'block';
             document.getElementById('cryptoSection').style.display = 'none';
@@ -227,6 +248,15 @@
       } catch (err) {
         showToast('Gagal memanggil API Charge', 'error');
       }
+    });
+
+    // Copy wallet button event listener
+    document.getElementById('copyWalletBtn').addEventListener('click', () => {
+      const addressInput = document.getElementById('cryptoWalletAddress');
+      addressInput.select();
+      addressInput.setSelectionRange(0, 99999); // For mobile devices
+      navigator.clipboard.writeText(addressInput.value);
+      showToast('Alamat wallet berhasil disalin!');
     });
 
     let countdownTimer = null;
