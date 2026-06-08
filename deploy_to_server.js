@@ -21,7 +21,8 @@ conn.on('ready', () => {
       { local: 'public/tester.html', remote: '/opt/bcagateaway/public/tester.html' },
       { local: 'public/docs.html', remote: '/opt/bcagateaway/public/docs.html' },
       { local: 'utils/cryptoRates.js', remote: '/opt/bcagateaway/utils/cryptoRates.js' },
-      { local: 'utils/qris.js', remote: '/opt/bcagateaway/utils/qris.js' }
+      { local: 'utils/qris.js', remote: '/opt/bcagateaway/utils/qris.js' },
+      { local: 'utils/coinbasePersonal.js', remote: '/opt/bcagateaway/utils/coinbasePersonal.js' }
     ];
 
     let uploadIndex = 0;

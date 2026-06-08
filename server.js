@@ -9,6 +9,7 @@ const qrisUtil = require('./utils/qris');
 const checkerService = require('./services/bcaChecker');
 const bcaScraper = require('./services/bcaScraper');
 const cryptoRates = require('./utils/cryptoRates');
+const coinbasePersonal = require('./utils/coinbasePersonal');
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -455,46 +456,31 @@ app.post('/api/v1/charge', authenticateApiKey, async (req, res) => {
 
   try {
     if (method === 'crypto') {
-      if (!req.merchant.coinbase_api_key) {
-        return res.status(400).json({ status: 'error', message: 'Coinbase Commerce API Key belum dikonfigurasi untuk merchant ini.' });
+      const apiKey = req.merchant.coinbase_api_key;
+      const apiSecret = req.merchant.coinbase_webhook_secret;
+
+      if (!apiKey || !apiSecret) {
+        return res.status(400).json({ status: 'error', message: 'API Key atau API Secret Coinbase belum dikonfigurasi untuk merchant ini.' });
       }
 
-      console.log(`[Crypto Charge] Creating Coinbase charge for merchant "${req.merchant.name}", IDR ${baseAmt}...`);
-      
-      const cbResponse = await fetch('https://api.commerce.coinbase.com/charges', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CC-Api-Key': req.merchant.coinbase_api_key,
-          'X-CC-Version': '2018-03-22',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          name: `Order ${external_id}`,
-          description: `Pembayaran Order #${external_id} - ${req.merchant.name}`,
-          pricing_type: 'fixed_price',
-          local_price: {
-            amount: baseAmt.toString(),
-            currency: 'IDR'
-          },
-          metadata: {
-            external_id: external_id,
-            merchant_id: req.merchant.id
-          }
-        })
-      });
+      console.log(`[Crypto Charge] Creating custom top-up address for merchant "${req.merchant.name}", IDR ${baseAmt}...`);
 
-      if (!cbResponse.ok) {
-        const errorText = await cbResponse.text();
-        throw new Error(`Coinbase Commerce API error: ${cbResponse.status} - ${errorText}`);
-      }
+      // 1. Get current exchange rate for USDT
+      const rate = await cryptoRates.getUsdtToIdrPrice();
+      // Calculate amount in USDT (precision to 6 decimals)
+      const amountCrypto = parseFloat((baseAmt / rate).toFixed(6));
 
-      const cbData = await cbResponse.json();
-      const chargeCode = cbData.data.code;
-      const hostedUrl = cbData.data.hosted_url;
+      // 2. Fetch the Coinbase USDT Account ID
+      const accountId = await coinbasePersonal.getAccountId(apiKey, apiSecret, 'USDT');
 
-      // Save crypto transaction to SQLite
+      // 3. Generate a new receiving address
+      const { id: addressId, address } = await coinbasePersonal.createAddress(apiKey, apiSecret, accountId);
+
+      console.log(`[Crypto Charge] Address generated: ${address} for amount ${amountCrypto} USDT`);
+
+      // 4. Save transaction to SQLite
+      // Format of coinbase_charge_code: address:addressId:accountId:amountCrypto
+      const chargeCode = `${address}:${addressId}:${accountId}:${amountCrypto}`;
       const result = await database.run(
         'INSERT INTO transactions (merchant_id, external_id, amount, status, payment_method, coinbase_charge_code, webhook_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [req.merchant.id, external_id, baseAmt, 'pending', 'crypto', chargeCode, webhook_url || null]
@@ -506,8 +492,9 @@ app.post('/api/v1/charge', authenticateApiKey, async (req, res) => {
         external_id: external_id,
         amount: baseAmt,
         payment_method: 'crypto',
-        hosted_url: hostedUrl,
-        coinbase_charge_code: chargeCode,
+        hosted_url: address, // Used as target wallet address
+        amount_crypto: amountCrypto,
+        coinbase_charge_code: address, // fallback reference
         created_at: new Date().toISOString()
       });
     }
@@ -569,7 +556,7 @@ app.get('/api/v1/status/:external_id', authenticateApiKey, async (req, res) => {
 
   try {
     const tx = await database.get(
-      'SELECT status, amount, payment_method, coinbase_charge_code, created_at, updated_at FROM transactions WHERE external_id = ? AND merchant_id = ?',
+      'SELECT id, status, amount, payment_method, coinbase_charge_code, created_at, updated_at FROM transactions WHERE external_id = ? AND merchant_id = ?',
       [external_id, req.merchant.id]
     );
 
@@ -577,17 +564,52 @@ app.get('/api/v1/status/:external_id', authenticateApiKey, async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Transaksi tidak ditemukan' });
     }
 
+    const parts = (tx.coinbase_charge_code || '').split(':');
+    const isPersonalCrypto = parts.length === 4;
+
+    if (tx.payment_method === 'crypto' && tx.status === 'pending' && isPersonalCrypto) {
+      const [address, addressId, accountId, amountCrypto] = parts;
+      const apiKey = req.merchant.coinbase_api_key;
+      const apiSecret = req.merchant.coinbase_webhook_secret;
+
+      if (apiKey && apiSecret) {
+        try {
+          console.log(`[Crypto Status] Polling Coinbase transactions for address: ${address}...`);
+          const transactions = await coinbasePersonal.checkTransactions(apiKey, apiSecret, accountId, addressId);
+          
+          // Look for completed transaction matching the target cryptocurrency and amount
+          const matchingTx = transactions.find(t => {
+            const matchesAmount = parseFloat(t.amount.amount) >= parseFloat(amountCrypto);
+            return t.status === 'completed' && matchesAmount;
+          });
+
+          if (matchingTx) {
+            console.log(`[Crypto Status] Matching transaction found! ID: ${matchingTx.id}. Marking as success.`);
+            await checkerService.markTransactionSuccess(tx.id, matchingTx.id);
+            tx.status = 'success'; // Update local variable for output response
+          }
+        } catch (err) {
+          console.error('[Crypto Status Check Error]', err.message);
+        }
+      }
+    }
+
+    const walletAddress = isPersonalCrypto ? parts[0] : (tx.coinbase_charge_code || null);
+    const amountCrypto = isPersonalCrypto ? parseFloat(parts[3]) : null;
+
     res.json({
       external_id: external_id,
       status: tx.status,
       amount: tx.amount,
       payment_method: tx.payment_method || 'qris',
-      coinbase_charge_code: tx.coinbase_charge_code || null,
-      hosted_url: tx.coinbase_charge_code ? `https://commerce.coinbase.com/charges/${tx.coinbase_charge_code}` : null,
+      coinbase_charge_code: walletAddress,
+      hosted_url: walletAddress,
+      amount_crypto: amountCrypto,
       created_at: tx.created_at,
       updated_at: tx.updated_at
     });
   } catch (err) {
+    console.error('[Status API Error]', err.message);
     res.status(500).json({ status: 'error', message: 'Gagal mengambil status transaksi' });
   }
 });
