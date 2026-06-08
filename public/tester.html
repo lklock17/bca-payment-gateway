@@ -222,15 +222,15 @@
       let networkNameDisplay = '';
       
       if (network === 'polygon') {
-        contractAddress = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F';
+        contractAddress = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F@137';
         explorerUrl = `https://polygonscan.com/address/${address}`;
         networkNameDisplay = 'Polygon (USDT)';
       } else if (network === 'ethereum') {
-        contractAddress = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
+        contractAddress = '0xdAC17F958D2ee523a2206206994597C13D831ec7@1';
         explorerUrl = `https://etherscan.io/address/${address}`;
         networkNameDisplay = 'Ethereum ERC-20 (USDT)';
       } else if (network === 'arbitrum') {
-        contractAddress = '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9';
+        contractAddress = '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9@42161';
         explorerUrl = `https://arbiscan.io/address/${address}`;
         networkNameDisplay = 'Arbitrum One (USDT)';
       }
