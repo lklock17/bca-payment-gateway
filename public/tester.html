@@ -122,20 +122,29 @@
             <div style="font-size: 2.2rem; font-weight: 800; color: #10b981; margin-bottom: 16px; font-family: monospace;" id="cryptoUSDTAmount">
               0.00 USDT
             </div>
-            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 6px;">
-              Jaringan: <strong>Polygon (USDT)</strong>
-            </p>
             
             <div class="form-group" style="max-width: 420px; margin: 0 auto 20px auto;">
-              <label class="form-label" style="font-size: 0.8rem; text-align: left; display: block; margin-bottom: 4px;">Alamat Dompet Penerima:</label>
+              <label class="form-label" style="font-size: 0.8rem; text-align: left; display: block; margin-bottom: 4px;">Alamat Dompet Penerima (USDT):</label>
               <div style="display: flex; gap: 8px;">
                 <input type="text" id="cryptoWalletAddress" class="form-control" readonly style="font-family: monospace; font-size: 0.8rem; text-align: center; background: rgba(255,255,255,0.05); color: #fff;">
                 <button type="button" class="btn btn-secondary" id="copyWalletBtn" style="padding: 0 16px; font-size: 0.85rem;">Copy</button>
               </div>
             </div>
 
+            <!-- Petunjuk Cara Bayar -->
+            <div style="text-align: left; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 16px; margin: 20px auto; max-width: 450px; font-size: 0.85rem; line-height: 1.5;">
+              <strong style="color: #60a5fa; display: block; margin-bottom: 8px;">Cara Pembayaran Crypto:</strong>
+              <ol style="margin: 0; padding-left: 20px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 6px;">
+                <li>Buka aplikasi dompet/exchange Anda (seperti <strong>Binance, Trust Wallet, MetaMask, Indodax, Tokocrypto</strong>, dll.).</li>
+                <li>Pilih menu <strong>Kirim / Penarikan (Send / Withdraw)</strong>, lalu pilih koin <strong>USDT</strong>.</li>
+                <li>Pilih jaringan transfer. Anda bebas menggunakan jaringan <strong>ERC-20 (Ethereum), Polygon, atau Arbitrum</strong> (pastikan jaringan di wallet pengirim sama dengan jaringan di tujuan).</li>
+                <li>Masukkan nominal transfer tepat sebesar: <strong style="color: #10b981;"><span id="instructionAmount">0.00</span> USDT</strong> agar transaksi terverifikasi otomatis.</li>
+                <li>Pembayaran Anda akan otomatis terkonfirmasi oleh sistem dalam 1-5 menit setelah dana terdeteksi masuk.</li>
+              </ol>
+            </div>
+
             <a id="coinbasePayBtn" href="#" target="_blank" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; padding:12px 24px; font-weight:600; text-decoration:none; justify-content:center;">
-              <span>Cek Alamat di Explorer</span>
+              <span>Cek Alamat di Etherscan Explorer</span>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
             </a>
           </div>
@@ -225,9 +234,10 @@
             // Set USDT amount and wallet address fields
             document.getElementById('cryptoUSDTAmount').innerText = `${data.amount_crypto} USDT`;
             document.getElementById('cryptoWalletAddress').value = data.hosted_url;
+            document.getElementById('instructionAmount').innerText = data.amount_crypto;
             
-            // Link explorer to CoinbasePayBtn
-            document.getElementById('coinbasePayBtn').href = `https://polygonscan.com/address/${data.hosted_url}`;
+            // Link explorer to CoinbasePayBtn (using Etherscan)
+            document.getElementById('coinbasePayBtn').href = `https://etherscan.io/address/${data.hosted_url}`;
             document.getElementById('countdownText').innerText = 'Menunggu pembayaran crypto terdeteksi...';
           } else {
             document.getElementById('qrisSection').style.display = 'block';
