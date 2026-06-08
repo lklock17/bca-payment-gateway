@@ -930,7 +930,13 @@
 
       let actionBtn = '';
       if (tx.payment_method === 'crypto') {
-        actionBtn = `<a class="btn btn-primary btn-sm" href="https://commerce.coinbase.com/charges/${tx.coinbase_charge_code}" target="_blank" style="display:inline-flex; align-items:center; justify-content:center; text-decoration:none;">Link Coinbase</a>`;
+        const parts = (tx.coinbase_charge_code || '').split(':');
+        const walletAddress = parts[0];
+        if (parts.length === 4 || (walletAddress && walletAddress.startsWith('0x'))) {
+          actionBtn = `<a class="btn btn-primary btn-sm" href="https://etherscan.io/address/${walletAddress}" target="_blank" style="display:inline-flex; align-items:center; justify-content:center; text-decoration:none;">Cek Etherscan</a>`;
+        } else {
+          actionBtn = `<a class="btn btn-primary btn-sm" href="https://commerce.coinbase.com/charges/${tx.coinbase_charge_code}" target="_blank" style="display:inline-flex; align-items:center; justify-content:center; text-decoration:none;">Link Coinbase</a>`;
+        }
       } else {
         actionBtn = `<button class="btn btn-primary btn-sm" onclick="viewQrModal('${tx.qris_image}', '${tx.qris_string}', ${tx.amount}, '${tx.external_id}')">Lihat QR</button>`;
       }
