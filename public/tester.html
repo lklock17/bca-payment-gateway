@@ -122,6 +122,11 @@
             <div style="font-size: 2.2rem; font-weight: 800; color: #10b981; margin-bottom: 16px; font-family: monospace;" id="cryptoUSDTAmount">
               0.00 USDT
             </div>
+
+            <!-- QR Code Alamat Wallet -->
+            <div style="background: #fff; padding: 12px; border-radius: 8px; display: inline-block; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+              <img id="cryptoQrImg" src="" alt="Crypto Wallet Address QR" style="width: 200px; height: 200px; display: block;">
+            </div>
             
             <div class="form-group" style="max-width: 420px; margin: 0 auto 20px auto;">
               <label class="form-label" style="font-size: 0.8rem; text-align: left; display: block; margin-bottom: 4px;">Alamat Dompet Penerima (USDT):</label>
@@ -235,6 +240,9 @@
             document.getElementById('cryptoUSDTAmount').innerText = `${data.amount_crypto} USDT`;
             document.getElementById('cryptoWalletAddress').value = data.hosted_url;
             document.getElementById('instructionAmount').innerText = data.amount_crypto;
+
+            // Generate QR code for the raw wallet address (compatible with all exchanges & wallets)
+            document.getElementById('cryptoQrImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${data.hosted_url}`;
             
             // Link explorer to CoinbasePayBtn (using Etherscan)
             document.getElementById('coinbasePayBtn').href = `https://etherscan.io/address/${data.hosted_url}`;
