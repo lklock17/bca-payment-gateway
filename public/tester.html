@@ -73,6 +73,14 @@
               <label class="form-label" for="externalId">ID Eksternal / Order ID</label>
               <input type="text" id="externalId" class="form-control" placeholder="ORDER-12345" required>
             </div>
+
+            <div class="form-group">
+              <label class="form-label" for="paymentMethod">Metode Pembayaran</label>
+              <select id="paymentMethod" class="form-control">
+                <option value="qris">BCA QRIS</option>
+                <option value="crypto">Crypto (Coinbase Commerce)</option>
+              </select>
+            </div>
             
             <div class="form-group">
               <label class="form-label" for="amount">Nominal Transaksi (Rupiah)</label>
@@ -85,17 +93,38 @@
               <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 4px;">URL tujuan notifikasi sukses pembayaran. Endpoint simulasi lokal diisi default.</small>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-block">Buat QRIS Dinamis</button>
+            <button type="submit" class="btn btn-primary btn-block">Buat Invoice Pembayaran</button>
           </form>
         </div>
 
-        <!-- QRIS Output Panel (Tampil setelah submit) -->
+        <!-- QRIS/Crypto Output Panel (Tampil setelah submit) -->
         <div id="qrisOutputPanel" class="glass-panel" style="padding: 24px; display: none; text-align: center;">
           <h3 style="margin-bottom: 16px; text-align: left;">2. Tampilan Invoice Pembayaran</h3>
           
-          <div class="qr-image-container" style="background: #fff; padding: 12px; border-radius: 8px; display: inline-block;">
-            <img id="dynamicQrImg" src="" alt="Dynamic QRIS" style="width: 250px; height: 250px;">
+          <!-- QRIS Section -->
+          <div id="qrisSection">
+            <div class="qr-image-container" style="background: #fff; padding: 12px; border-radius: 8px; display: inline-block;">
+              <img id="dynamicQrImg" src="" alt="Dynamic QRIS" style="width: 250px; height: 250px;">
+            </div>
           </div>
+
+          <!-- Crypto Section -->
+          <div id="cryptoSection" style="display: none; padding: 20px 0;">
+            <div style="font-size: 3rem; color: #60a5fa; margin-bottom: 16px;">
+              <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;">
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 20px;">
+              Silakan lakukan pembayaran menggunakan portal pembayaran Coinbase Commerce.
+            </p>
+            <a id="coinbasePayBtn" href="#" target="_blank" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; padding:12px 24px; font-weight:600; text-decoration:none; justify-content:center;">
+              <span>Bayar dengan Crypto</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </a>
+          </div>
+
           <div style="font-size: 1.4rem; font-weight: 700; color: #fff; margin-top: 12px;" id="outputAmount">Rp 15.000</div>
           <p style="color: var(--text-secondary); font-size: 0.85rem;" id="outputTxId">ID Transaksi: -</p>
           
@@ -155,6 +184,7 @@
       
       const apiKey = document.getElementById('apiKey').value;
       const external_id = document.getElementById('externalId').value;
+      const payment_method = document.getElementById('paymentMethod').value;
       const amount = document.getElementById('amount').value;
       const webhook_url = document.getElementById('webhookUrl').value;
 
@@ -165,20 +195,32 @@
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ external_id, amount, webhook_url })
+          body: JSON.stringify({ external_id, amount, webhook_url, payment_method })
         });
 
         const data = await response.json();
 
         if (response.ok) {
-          showToast('Dynamic QRIS berhasil dibuat!');
-          document.getElementById('dynamicQrImg').src = data.qris_image;
+          showToast(payment_method === 'crypto' ? 'Invoice Coinbase Crypto berhasil dibuat!' : 'Invoice Dynamic QRIS berhasil dibuat!');
+          
+          if (payment_method === 'crypto') {
+            document.getElementById('qrisSection').style.display = 'none';
+            document.getElementById('cryptoSection').style.display = 'block';
+            document.getElementById('coinbasePayBtn').href = data.hosted_url;
+            document.getElementById('countdownText').innerText = 'Menunggu pembayaran via Coinbase Commerce...';
+          } else {
+            document.getElementById('qrisSection').style.display = 'block';
+            document.getElementById('cryptoSection').style.display = 'none';
+            document.getElementById('dynamicQrImg').src = data.qris_image;
+            document.getElementById('countdownText').innerText = 'Menghubungkan ke KlikBCA...';
+          }
+
           document.getElementById('outputAmount').innerText = 'Rp ' + data.amount.toLocaleString('id-ID');
           document.getElementById('outputTxId').innerText = `ID Eksternal: ${data.external_id} | ID Transaksi: #${data.transaction_id}`;
           document.getElementById('qrisOutputPanel').style.display = 'block';
           
           // Reset countdown timer
-          startStatusCountdown(data.transaction_id, apiKey);
+          startStatusCountdown(data.transaction_id, apiKey, payment_method);
         } else {
           showToast(data.message || 'API Key salah atau payload tidak valid', 'error');
         }
@@ -188,7 +230,7 @@
     });
 
     let countdownTimer = null;
-    function startStatusCountdown(txId, apiKey) {
+    function startStatusCountdown(txId, apiKey, paymentMethod) {
       if (countdownTimer) clearInterval(countdownTimer);
       
       const statusBox = document.getElementById('statusBox');
@@ -200,17 +242,25 @@
       statusText.innerText = 'Status: PENDING';
       statusText.style.color = 'var(--warning)';
 
-      let countdown = 15; // 15 seconds loop
-      countdownText.innerText = `Menghubungkan ke KlikBCA dalam ${countdown} detik...`;
+      const isCrypto = paymentMethod === 'crypto';
+      let countdown = isCrypto ? 5 : 15; // Poll faster for crypto
+      
+      const updateText = () => {
+        if (isCrypto) {
+          countdownText.innerText = `Mengecek status Coinbase dalam ${countdown} detik...`;
+        } else {
+          countdownText.innerText = `Menghubungkan ke KlikBCA dalam ${countdown} detik...`;
+        }
+      };
+
+      updateText();
 
       countdownTimer = setInterval(async () => {
         countdown--;
         if (countdown <= 0) {
-          countdownText.innerText = `Sedang mengecek KlikBCA... (cpidson)`;
+          countdownText.innerText = isCrypto ? 'Sedang mengecek Coinbase Commerce...' : 'Sedang mengecek KlikBCA...';
           
           try {
-            // Panggil backend API status
-            const res = await fetch(`/api/transactions`); // for debug
             const response = await fetch(`/api/v1/status/${document.getElementById('externalId').value}`, {
               headers: { 'Authorization': `Bearer ${apiKey}` }
             });
@@ -222,7 +272,7 @@
               statusBox.style.borderColor = 'rgba(16, 185, 129, 0.3)';
               statusText.innerText = 'Status: SUKSES (TERBAYAR)';
               statusText.style.color = 'var(--success)';
-              countdownText.innerText = 'Pembayaran terkonfirmasi otomatis!';
+              countdownText.innerText = isCrypto ? 'Pembayaran crypto terkonfirmasi otomatis via Coinbase!' : 'Pembayaran terkonfirmasi otomatis!';
               showToast('Pembayaran Sukses!');
               return;
             }
@@ -230,9 +280,10 @@
             console.error('Error checking status:', e);
           }
           
-          countdown = 15; // Reset loop
+          countdown = isCrypto ? 5 : 15; // Reset loop
+          updateText();
         } else {
-          countdownText.innerText = `Menghubungkan ke KlikBCA dalam ${countdown} detik...`;
+          updateText();
         }
       }, 1000);
     }

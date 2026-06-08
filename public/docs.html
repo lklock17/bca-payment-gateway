@@ -281,7 +281,7 @@
       <ul class="docs-nav">
         <li class="docs-nav-item active"><a href="#pengenalan">Pengenalan</a></li>
         <li class="docs-nav-item"><a href="#autentikasi">Autentikasi</a></li>
-        <li class="docs-nav-item"><a href="#charge-api">Charge API (Buat QRIS)</a></li>
+        <li class="docs-nav-item"><a href="#charge-api">Charge API (Buat Invoice)</a></li>
         <li class="docs-nav-item"><a href="#status-api">Status API</a></li>
         <li class="docs-nav-item"><a href="#webhook-callback">Webhook Callback</a></li>
         <li class="docs-nav-item"><a href="#contoh-kode">Contoh Integrasi</a></li>
@@ -294,19 +294,15 @@
       <section id="pengenalan" class="docs-section">
         <h2>Pengenalan</h2>
         <p style="color: var(--text-secondary); font-size: 1.05rem; margin-bottom: 16px;">
-          Selamat datang di **BCA Payment Gateway API**. Gateway pembayaran mandiri ini memungkinkan website e-commerce atau aplikasi toko online Anda untuk memproses pembayaran QRIS secara langsung menggunakan akun KlikBCA Merchant Anda.
+          Selamat datang di **BCA Payment Gateway API**. Gateway pembayaran mandiri ini memungkinkan website e-commerce atau aplikasi toko online Anda untuk memproses pembayaran **BCA QRIS** (via KlikBCA Merchant) dan **Cryptocurrency** (via Coinbase Commerce) secara mudah dan otomatis.
         </p>
         <p style="color: var(--text-secondary); font-size: 1.05rem;">
-          Alur kerja sistem ini sangat sederhana:
+          Alur kerja sistem ini dirancang dinamis:
         </p>
-        <ol style="margin-left: 20px; margin-top: 12px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px;">
-          <li>Aplikasi toko online Anda mengirimkan nominal belanja ke API ini.</li>
-          <li>API menambahkan kode unik nominal kecil (sebagai <strong>fee/suffix</strong> antara 1-199 rupiah) untuk keperluan verifikasi.</li>
-          <li>API memodifikasi QRIS statis merchant Anda menjadi QRIS dinamis ber-nominal secara offline dan mengembalikan gambar QR code.</li>
-          <li>Pembeli memindai QRIS dan melakukan pembayaran.</li>
-          <li>Sistem standby scraper kami mendeteksi mutasi masuk di rekening KlikBCA secara real-time dan mencocokkan nominal transaksi secara otomatis.</li>
-          <li>API mengirimkan webhook instan ke url toko online Anda untuk mengonfirmasi pembayaran sukses.</li>
-        </ol>
+        <ul style="margin-left: 20px; margin-top: 12px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px;">
+          <li><strong>BCA QRIS</strong>: API menambahkan suffix nominal unik (1-199 rupiah), mengonversi QRIS statis menjadi QRIS dinamis ber-nominal secara offline, mendeteksi transfer masuk ke KlikBCA via browser scraper, dan memicu webhook instan.</li>
+          <li><strong>Crypto (Coinbase Commerce)</strong>: API membuat tagihan (*charge*) ke Coinbase Commerce, memberikan link portal pembayaran resmi Coinbase (mendukung USDT, USDC, BTC, ETH, dll.), dan memproses konfirmasi pembayaran otomatis via webhook Coinbase Commerce.</li>
+        </ul>
       </section>
 
       <!-- SECTION: Authentication -->
@@ -328,9 +324,9 @@
 
       <!-- SECTION: Charge API -->
       <section id="charge-api" class="docs-section">
-        <h2>Charge API (Buat Invoice QRIS)</h2>
+        <h2>Charge API (Buat Invoice)</h2>
         <p style="color: var(--text-secondary); margin-bottom: 24px;">
-          Gunakan endpoint ini untuk membuat invoice pembayaran baru. API akan mengembalikan payload data QRIS dinamis beserta gambar barcode Base64.
+          Gunakan endpoint ini untuk membuat invoice pembayaran baru (QRIS maupun Crypto).
         </p>
 
         <div style="margin-bottom: 24px;">
@@ -359,7 +355,13 @@
               <td class="param-name">amount</td>
               <td class="param-type">Number</td>
               <td class="param-req">Wajib</td>
-              <td>Nominal dasar pembayaran. Harus bernilai positif dan bulat.</td>
+              <td>Nominal dasar pembayaran dalam mata uang IDR. Harus bernilai positif dan bulat.</td>
+            </tr>
+            <tr>
+              <td class="param-name">payment_method</td>
+              <td class="param-type">String</td>
+              <td class="param-opt">Opsional</td>
+              <td>Pilihan metode pembayaran: <code>qris</code> atau <code>crypto</code>. Default adalah <code>qris</code>.</td>
             </tr>
             <tr>
               <td class="param-name">webhook_url</td>
@@ -370,20 +372,36 @@
           </tbody>
         </table>
 
-        <h4 style="margin-top: 32px; color: #fff;">Respons Payload (JSON) - 201 Created</h4>
+        <h4 style="margin-top: 32px; color: #fff;">Respons Payload (JSON) untuk BCA QRIS - 201 Created</h4>
         <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
-          API akan menambahkan suffix nominal acak (1-199 rupiah) yang disimpan dalam variabel <code>fee</code> untuk membedakan transaksi nominal kembar. Jumlah akhir yang harus dibayar adalah total dari <code>amount</code> (amount + fee).
+          Jika <code>payment_method</code> diisi <code>qris</code> (atau dikosongkan), API akan mengembalikan data QRIS dinamis beserta Base64 QR code image:
         </p>
-        <pre class="code-block active" style="border-radius: var(--border-radius-md);">{
+        <pre class="code-block active" style="border-radius: var(--border-radius-md); margin-bottom: 32px;">{
   "status": "pending",
   "transaction_id": 18,
   "external_id": "ORDER-100249",
   "amount": 10103,
   "base_amount": 10000,
   "fee": 103,
+  "payment_method": "qris",
   "qris_string": "0002010102125144...",
   "qris_image": "data:image/png;base64,iVBORw0KGgo...",
   "created_at": "2026-06-05T14:53:45.000Z"
+}</pre>
+
+        <h4 style="margin-top: 32px; color: #fff;">Respons Payload (JSON) untuk Coinbase Crypto - 201 Created</h4>
+        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
+          Jika <code>payment_method</code> diisi <code>crypto</code>, API akan menghubungi Coinbase Commerce dan mengembalikan URL checkout portal pembayaran resmi Coinbase:
+        </p>
+        <pre class="code-block active" style="border-radius: var(--border-radius-md);">{
+  "status": "pending",
+  "transaction_id": 19,
+  "external_id": "ORDER-100249",
+  "amount": 10000,
+  "payment_method": "crypto",
+  "hosted_url": "https://commerce.coinbase.com/charges/ABCDEF12",
+  "coinbase_charge_code": "ABCDEF12",
+  "created_at": "2026-06-08T08:15:30.000Z"
 }</pre>
       </section>
 
@@ -403,9 +421,12 @@
         <pre class="code-block active" style="border-radius: var(--border-radius-md);">{
   "external_id": "ORDER-100249",
   "status": "success",
-  "amount": 10103,
-  "created_at": "2026-06-05T14:53:45.000Z",
-  "updated_at": "2026-06-05T14:55:00.000Z"
+  "amount": 10000,
+  "payment_method": "crypto",
+  "coinbase_charge_code": "ABCDEF12",
+  "hosted_url": "https://commerce.coinbase.com/charges/ABCDEF12",
+  "created_at": "2026-06-08T08:15:30.000Z",
+  "updated_at": "2026-06-08T08:18:45.000Z"
 }</pre>
       </section>
 
@@ -413,17 +434,17 @@
       <section id="webhook-callback" class="docs-section">
         <h2>Webhook Callback</h2>
         <p style="color: var(--text-secondary); margin-bottom: 16px;">
-          Ketika pembeli menyelesaikan transaksi dan scraper berhasil mencocokkan mutasi rekening, gateway akan mengirimkan HTTP POST request berisi detail pembayaran ke URL <code>webhook_url</code> yang dikonfigurasi saat membuat charge.
+          Ketika pembeli menyelesaikan transaksi (baik melalui transfer BCA QRIS maupun portal Coinbase Commerce), gateway akan otomatis mengirimkan HTTP POST request berisi detail pembayaran ke URL <code>webhook_url</code> yang dikonfigurasi.
         </p>
         <p style="color: var(--text-secondary); margin-bottom: 24px;">
-          Sistem akan mengulangi pengiriman webhook hingga 3 kali dengan jeda waktu 2 detik jika server Anda mengembalikan respons selain HTTP 200 OK.
+          Payload notifikasi callback yang dikirimkan terstandardisasi sama untuk kedua metode pembayaran tersebut agar mudah diproses di sistem Anda.
         </p>
 
         <h4 style="color: #fff; margin-bottom: 12px;">Payload Webhook Callback (JSON)</h4>
         <pre class="code-block active" style="border-radius: var(--border-radius-md);">{
   "transaction_id": 18,
   "external_id": "ORDER-100249",
-  "amount": 10103,
+  "amount": 10000,
   "status": "success",
   "updated_at": "2026-06-05T14:55:00.000Z"
 }</pre>
@@ -447,13 +468,14 @@
           <!-- CURL CODE -->
           <div class="code-block active" id="code-curl">
             <button class="copy-code-btn" onclick="copySnippet('code-curl-content')">Salin</button>
-            <span id="code-curl-content"># Membuat invoice transaksi
+            <span id="code-curl-content"># Membuat invoice transaksi (Crypto)
 curl -X POST http://IP_VPS_ANDA:3005/api/v1/charge \
   -H "Authorization: Bearer BCA-GW-YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "external_id": "ORDER-100249",
     "amount": 10000,
+    "payment_method": "crypto",
     "webhook_url": "https://website-anda.com/webhook"
   }'
 
@@ -466,13 +488,14 @@ curl -X GET http://IP_VPS_ANDA:3005/api/v1/status/ORDER-100249 \
           <div class="code-block" id="code-php">
             <button class="copy-code-btn" onclick="copySnippet('code-php-content')">Salin</button>
             <span id="code-php-content">&lt;?php
-// Contoh Request Charge API di PHP
+// Contoh Request Charge API di PHP untuk Crypto
 $url = "http://IP_VPS_ANDA:3005/api/v1/charge";
 $apiKey = "BCA-GW-YOUR_API_KEY";
 
 $payload = [
     "external_id" => "ORDER-100249",
     "amount" => 10000,
+    "payment_method" => "crypto",
     "webhook_url" => "https://website-anda.com/webhook"
 ];
 
@@ -489,9 +512,10 @@ $response = curl_exec($ch);
 curl_close($ch);
 
 $data = json_decode($response, true);
-if (isset($data['qris_image'])) {
-    // Tampilkan QRIS ke pembeli
-    echo '&lt;img src="' . $data['qris_image'] . '" alt="QRIS" /&gt;';
+if (isset($data['hosted_url'])) {
+    // Alihkan pembeli ke halaman pembayaran crypto
+    header("Location: " . $data['hosted_url']);
+    exit;
 }
 ?&gt;</span>
           </div>
@@ -506,6 +530,7 @@ async function createCharge() {
     const response = await axios.post('http://IP_VPS_ANDA:3005/api/v1/charge', {
       external_id: 'ORDER-100249',
       amount: 10000,
+      payment_method: 'crypto',
       webhook_url: 'https://website-anda.com/webhook'
     }, {
       headers: {
@@ -514,8 +539,8 @@ async function createCharge() {
       }
     });
 
-    console.log('Nominal Akhir (+Fee):', response.data.amount);
-    console.log('Base64 QRIS Image:', response.data.qris_image);
+    console.log('Metode Pembayaran:', response.data.payment_method);
+    console.log('Halaman Pembayaran Crypto:', response.data.hosted_url);
   } catch (error) {
     console.error('Error creating charge:', error.response ? error.response.data : error.message);
   }

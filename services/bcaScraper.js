@@ -63,21 +63,20 @@ class BcaSession {
 
     // Type credentials
     console.log('[Scraper] Entering credentials...');
-    await this.page.focus(usernameSelector);
-    await this.page.type(usernameSelector, this.email, { delay: 10 });
-    await this.page.evaluate((sel, val) => {
-      const el = document.querySelector(sel);
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    }, usernameSelector, this.email);
-
-    await this.page.focus(passwordSelector);
-    await this.page.type(passwordSelector, this.password, { delay: 10 });
-    await this.page.evaluate((sel, val) => {
-      const el = document.querySelector(sel);
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    }, passwordSelector, this.password);
+    await this.page.evaluate((selUser, valUser, selPass, valPass) => {
+      const elUser = document.querySelector(selUser);
+      const elPass = document.querySelector(selPass);
+      if (elUser) {
+        elUser.value = valUser;
+        elUser.dispatchEvent(new Event('input', { bubbles: true }));
+        elUser.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (elPass) {
+        elPass.value = valPass;
+        elPass.dispatchEvent(new Event('input', { bubbles: true }));
+        elPass.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }, usernameSelector, this.email, passwordSelector, this.password);
 
     // Dismiss cookie banner
     await this.page.evaluate(() => {

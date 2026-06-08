@@ -404,6 +404,7 @@
                   <th>ID Transaksi</th>
                   <th>Merchant</th>
                   <th>ID Eksternal</th>
+                  <th>Metode</th>
                   <th>Nominal</th>
                   <th>Status</th>
                   <th>Waktu Pembuatan</th>
@@ -478,6 +479,7 @@
                   <th>ID Transaksi</th>
                   <th>Merchant</th>
                   <th>ID Eksternal</th>
+                  <th>Metode</th>
                   <th>Nominal</th>
                   <th>Status</th>
                   <th>Waktu</th>
@@ -526,9 +528,9 @@
 
   <!-- MODAL: Add/Edit Merchant -->
   <div class="modal-overlay" id="merchantModal">
-    <div class="glass-panel modal-content">
+    <div class="glass-panel modal-content" style="max-height: 90vh; overflow-y: auto;">
       <button class="modal-close" onclick="closeMerchantModal()">×</button>
-      <h3 style="margin-bottom: 24px;" id="merchantModalTitle">Tambah Akun BCA Merchant</h3>
+      <h3 style="margin-bottom: 24px;" id="merchantModalTitle">Tambah Akun BCA/Crypto Merchant</h3>
       
       <form id="merchantForm">
         <input type="hidden" id="merchantId">
@@ -536,18 +538,34 @@
           <label class="form-label" for="merchantName">Nama Merchant / Toko</label>
           <input type="text" id="merchantName" class="form-control" placeholder="Toko A" required>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="bcaUser">BCA User (Email Kasir klikbca)</label>
-          <input type="email" id="bcaUser" class="form-control" placeholder="kimmo.laau@gmail.com" required>
+        
+        <div style="border-top: 1px solid var(--card-border); margin: 20px 0; padding-top: 10px;">
+          <h4 style="margin-bottom: 12px; color: var(--accent-color);">1. Kredensial BCA QRIS (Opsional jika Crypto Aktif)</h4>
+          <div class="form-group">
+            <label class="form-label" for="bcaUser">BCA User (Email Kasir klikbca)</label>
+            <input type="email" id="bcaUser" class="form-control" placeholder="kimmo.laau@gmail.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="bcaPass">BCA Password</label>
+            <input type="password" id="bcaPass" class="form-control" placeholder="GanTeng188">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="staticQris">Payload String QRIS Statis</label>
+            <textarea id="staticQris" class="form-control" rows="3" placeholder="00020101021138530015ID.CO.QRIS..." style="resize: none; font-family: monospace; font-size: 0.8rem;"></textarea>
+            <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 4px;">Tempel kode string text QRIS statis dari KlikBCA Merchant Anda di sini.</small>
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="bcaPass">BCA Password</label>
-          <input type="password" id="bcaPass" class="form-control" placeholder="GanTeng188" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="staticQris">Payload String QRIS Statis</label>
-          <textarea id="staticQris" class="form-control" rows="4" placeholder="00020101021138530015ID.CO.QRIS..." required style="resize: none; font-family: monospace; font-size: 0.8rem;"></textarea>
-          <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 4px;">Tempel kode string text QRIS statis dari KlikBCA Merchant Anda di sini.</small>
+
+        <div style="border-top: 1px solid var(--card-border); margin: 20px 0; padding-top: 10px;">
+          <h4 style="margin-bottom: 12px; color: #60a5fa;">2. Kredensial Coinbase Crypto (Opsional jika QRIS Aktif)</h4>
+          <div class="form-group">
+            <label class="form-label" for="coinbaseApiKey">Coinbase Commerce API Key</label>
+            <input type="password" id="coinbaseApiKey" class="form-control" placeholder="Masukkan API Key dari Coinbase Commerce">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="coinbaseWebhookSecret">Coinbase Webhook Shared Secret</label>
+            <input type="password" id="coinbaseWebhookSecret" class="form-control" placeholder="Masukkan Webhook Shared Secret">
+          </div>
         </div>
         
         <div style="display: flex; gap: 12px; margin-top: 24px;">
@@ -792,13 +810,22 @@
             }
           }
 
+          let coinbaseStatusBadge = '';
+          if (m.coinbase_api_key) {
+            coinbaseStatusBadge = `<span class="badge" style="margin-left: 6px; background: rgba(96, 165, 250, 0.15); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.3);">Crypto: AKTIF</span>`;
+          } else {
+            coinbaseStatusBadge = `<span class="badge" style="margin-left: 6px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">Crypto: NONAKTIF</span>`;
+          }
+
           tr.innerHTML = `
             <td style="font-weight:600; color:#fff;">${m.name}</td>
-            <td>${m.bca_user || '<em style="color:var(--text-muted)">N/A</em>'}</td>
+            <td>
+              <div>BCA: ${m.bca_user || '<em style="color:var(--text-muted)">N/A</em>'}</div>
+            </td>
             <td>
               <span style="font-family: monospace; font-size:0.85rem; color:var(--text-secondary)">
-                User: ${m.bca_user ? '√ Set' : '× Not Set'}<br>
-                Pass: ${m.bca_pass ? '√ Set' : '× Not Set'}
+                BCA Set: ${m.bca_user ? '√' : '×'}<br>
+                Crypto Set: ${m.coinbase_api_key ? '√' : '×'}
               </span>
             </td>
             <td>
@@ -810,8 +837,11 @@
               </div>
             </td>
             <td>
-              <span class="badge badge-success">${m.status}</span>
-              ${bcaStatusBadge}
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <span class="badge badge-success" style="width:fit-content;">Status: ${m.status}</span>
+                ${bcaStatusBadge}
+                ${coinbaseStatusBadge}
+              </div>
             </td>
             <td>
               <div style="display:flex; gap:8px;">
@@ -894,17 +924,32 @@
         `<span class="badge badge-success">Sukses</span>` : 
         `<span class="badge badge-pending">Pending</span>`;
 
+      const methodBadge = tx.payment_method === 'crypto' ? 
+        `<span class="badge" style="background: rgba(96, 165, 250, 0.15); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.3);">Crypto</span>` : 
+        `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">QRIS</span>`;
+
+      let actionBtn = '';
+      if (tx.payment_method === 'crypto') {
+        actionBtn = `<a class="btn btn-primary btn-sm" href="https://commerce.coinbase.com/charges/${tx.coinbase_charge_code}" target="_blank" style="display:inline-flex; align-items:center; justify-content:center; text-decoration:none;">Link Coinbase</a>`;
+      } else {
+        actionBtn = `<button class="btn btn-primary btn-sm" onclick="viewQrModal('${tx.qris_image}', '${tx.qris_string}', ${tx.amount}, '${tx.external_id}')">Lihat QR</button>`;
+      }
+
+      const simulateBtn = (tx.status === 'pending') ? 
+        `<button class="btn btn-secondary btn-sm" onclick="simulatePayment(${tx.id})">Simulasi Bayar</button>` : '';
+
       tr.innerHTML = `
         <td>#${tx.id}</td>
         <td style="font-weight:500;">${tx.merchant_name}</td>
         <td style="font-family:monospace; font-size:0.85rem;">${tx.external_id}</td>
+        <td>${methodBadge}</td>
         <td style="font-weight:600; color:#fff;">${formatRupiah(tx.amount)}</td>
         <td>${statusBadge}</td>
         <td>${dateStr}</td>
         <td>
           <div style="display:flex; gap:8px;">
-            <button class="btn btn-primary btn-sm" onclick="viewQrModal('${tx.qris_image}', '${tx.qris_string}', ${tx.amount}, '${tx.external_id}')">Lihat QR</button>
-            ${tx.status === 'pending' ? `<button class="btn btn-secondary btn-sm" onclick="simulatePayment(${tx.id})">Simulasi Bayar</button>` : ''}
+            ${actionBtn}
+            ${simulateBtn}
           </div>
         </td>
       `;
@@ -928,7 +973,7 @@
     function openAddMerchantModal() {
       document.getElementById('merchantForm').reset();
       document.getElementById('merchantId').value = '';
-      document.getElementById('merchantModalTitle').innerText = 'Tambah Akun BCA Merchant';
+      document.getElementById('merchantModalTitle').innerText = 'Tambah Akun BCA/Crypto Merchant';
       document.getElementById('merchantModal').classList.add('active');
     }
 
@@ -938,7 +983,9 @@
       document.getElementById('bcaUser').value = m.bca_user || '';
       document.getElementById('bcaPass').value = m.bca_pass || '';
       document.getElementById('staticQris').value = m.static_qris || '';
-      document.getElementById('merchantModalTitle').innerText = 'Edit Akun BCA Merchant';
+      document.getElementById('coinbaseApiKey').value = m.coinbase_api_key || '';
+      document.getElementById('coinbaseWebhookSecret').value = m.coinbase_webhook_secret || '';
+      document.getElementById('merchantModalTitle').innerText = 'Edit Akun BCA/Crypto Merchant';
       document.getElementById('merchantModal').classList.add('active');
     }
 
@@ -999,8 +1046,18 @@
       const bca_user = document.getElementById('bcaUser').value;
       const bca_pass = document.getElementById('bcaPass').value;
       const static_qris = document.getElementById('staticQris').value;
+      const coinbase_api_key = document.getElementById('coinbaseApiKey').value;
+      const coinbase_webhook_secret = document.getElementById('coinbaseWebhookSecret').value;
 
-      const payload = { name, bca_user, bca_pass, static_qris };
+      const hasBca = bca_user && bca_pass && static_qris;
+      const hasCoinbase = coinbase_api_key && coinbase_webhook_secret;
+
+      if (!hasBca && !hasCoinbase) {
+        showToast('Kredensial KlikBCA Merchant atau Coinbase Commerce harus lengkap diisi salah satu', 'error');
+        return;
+      }
+
+      const payload = { name, bca_user, bca_pass, static_qris, coinbase_api_key, coinbase_webhook_secret };
       
       let url = '/api/merchants';
       let method = 'POST';

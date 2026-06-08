@@ -8,6 +8,7 @@ const database = require('./database');
 const qrisUtil = require('./utils/qris');
 const checkerService = require('./services/bcaChecker');
 const bcaScraper = require('./services/bcaScraper');
+const cryptoRates = require('./utils/cryptoRates');
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -90,7 +91,11 @@ function requireAdmin(req, res, next) {
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -227,7 +232,7 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
 // ==========================================
 app.get('/api/merchants', authenticateToken, async (req, res) => {
   try {
-    const merchants = await database.all('SELECT id, name, bca_user, bca_pass, static_qris, status, api_key, created_at FROM merchants');
+    const merchants = await database.all('SELECT id, name, bca_user, bca_pass, static_qris, crypto_address, coinbase_api_key, coinbase_webhook_secret, status, api_key, created_at FROM merchants');
     
     // Attach session status to each merchant
     const merchantsWithStatus = merchants.map(m => {
@@ -250,9 +255,17 @@ app.get('/api/merchants', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/merchants', authenticateToken, requireAdmin, async (req, res) => {
-  const { name, bca_user, bca_pass, static_qris } = req.body;
-  if (!name || !static_qris) {
-    return res.status(400).json({ message: 'Nama merchant dan static QRIS wajib diisi' });
+  const { name, bca_user, bca_pass, static_qris, crypto_address, coinbase_api_key, coinbase_webhook_secret } = req.body;
+  if (!name) {
+    return res.status(400).json({ message: 'Nama merchant wajib diisi' });
+  }
+
+  const hasBca = bca_user && bca_pass && static_qris;
+  const hasCoinbase = coinbase_api_key && coinbase_webhook_secret;
+  const hasDirectCrypto = crypto_address;
+
+  if (!hasBca && !hasCoinbase && !hasDirectCrypto) {
+    return res.status(400).json({ message: 'Kredensial KlikBCA, Coinbase Commerce, atau Alamat Crypto Wallet wajib diisi salah satu' });
   }
 
   try {
@@ -260,29 +273,61 @@ app.post('/api/merchants', authenticateToken, requireAdmin, async (req, res) => 
     const apiKey = 'BCA-GW-' + crypto.randomBytes(16).toString('hex').toUpperCase();
     
     await database.run(
-      'INSERT INTO merchants (name, bca_user, bca_pass, static_qris, api_key) VALUES (?, ?, ?, ?, ?)',
-      [name, bca_user, bca_pass, static_qris, apiKey]
+      'INSERT INTO merchants (name, bca_user, bca_pass, static_qris, crypto_address, coinbase_api_key, coinbase_webhook_secret, api_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        name, 
+        bca_user || null, 
+        bca_pass || null, 
+        static_qris || null, 
+        crypto_address || null, 
+        coinbase_api_key || null, 
+        coinbase_webhook_secret || null, 
+        apiKey
+      ]
     );
     res.status(201).json({ message: 'Merchant berhasil ditambahkan' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Gagal menambahkan merchant' });
   }
 });
 
 app.put('/api/merchants/:id', authenticateToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { name, bca_user, bca_pass, static_qris } = req.body;
+  const { name, bca_user, bca_pass, static_qris, crypto_address, coinbase_api_key, coinbase_webhook_secret } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ message: 'Nama merchant wajib diisi' });
+  }
+
+  const hasBca = bca_user && bca_pass && static_qris;
+  const hasCoinbase = coinbase_api_key && coinbase_webhook_secret;
+  const hasDirectCrypto = crypto_address;
+
+  if (!hasBca && !hasCoinbase && !hasDirectCrypto) {
+    return res.status(400).json({ message: 'Kredensial KlikBCA, Coinbase Commerce, atau Alamat Crypto Wallet wajib diisi salah satu' });
+  }
 
   try {
     const merchant = await database.get('SELECT id FROM merchants WHERE id = ?', [id]);
     if (!merchant) return res.status(404).json({ message: 'Merchant tidak ditemukan' });
 
     await database.run(
-      'UPDATE merchants SET name = ?, bca_user = ?, bca_pass = ?, static_qris = ? WHERE id = ?',
-      [name, bca_user, bca_pass, static_qris, id]
+      'UPDATE merchants SET name = ?, bca_user = ?, bca_pass = ?, static_qris = ?, crypto_address = ?, coinbase_api_key = ?, coinbase_webhook_secret = ? WHERE id = ?',
+      [
+        name, 
+        bca_user || null, 
+        bca_pass || null, 
+        static_qris || null, 
+        crypto_address || null, 
+        coinbase_api_key || null, 
+        coinbase_webhook_secret || null, 
+        id
+      ]
     );
     res.json({ message: 'Merchant berhasil diperbarui' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Gagal memperbarui merchant' });
   }
 });
@@ -309,7 +354,7 @@ app.get('/api/transactions', authenticateToken, async (req, res) => {
   const { limit } = req.query;
   try {
     let query = `
-      SELECT t.*, m.name as merchant_name 
+      SELECT t.*, m.name as merchant_name, m.crypto_address 
       FROM transactions t
       JOIN merchants m ON t.merchant_id = m.id
       ORDER BY t.created_at DESC
@@ -392,10 +437,10 @@ async function authenticateApiKey(req, res, next) {
 
 /**
  * Charge endpoint (POST /api/v1/charge)
- * Body: { external_id, amount, webhook_url }
+ * Body: { external_id, amount, webhook_url, payment_method }
  */
 app.post('/api/v1/charge', authenticateApiKey, async (req, res) => {
-  const { external_id, amount, webhook_url } = req.body;
+  const { external_id, amount, webhook_url, payment_method } = req.body;
 
   if (!external_id || !amount) {
     return res.status(400).json({ status: 'error', message: 'external_id dan amount wajib diisi' });
@@ -406,7 +451,68 @@ app.post('/api/v1/charge', authenticateApiKey, async (req, res) => {
     return res.status(400).json({ status: 'error', message: 'amount harus bernilai positif' });
   }
 
+  const method = payment_method === 'crypto' ? 'crypto' : 'qris';
+
   try {
+    if (method === 'crypto') {
+      if (!req.merchant.coinbase_api_key) {
+        return res.status(400).json({ status: 'error', message: 'Coinbase Commerce API Key belum dikonfigurasi untuk merchant ini.' });
+      }
+
+      console.log(`[Crypto Charge] Creating Coinbase charge for merchant "${req.merchant.name}", IDR ${baseAmt}...`);
+      
+      const cbResponse = await fetch('https://api.commerce.coinbase.com/charges', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CC-Api-Key': req.merchant.coinbase_api_key,
+          'X-CC-Version': '2018-03-22',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          name: `Order ${external_id}`,
+          description: `Pembayaran Order #${external_id} - ${req.merchant.name}`,
+          pricing_type: 'fixed_price',
+          local_price: {
+            amount: baseAmt.toString(),
+            currency: 'IDR'
+          },
+          metadata: {
+            external_id: external_id,
+            merchant_id: req.merchant.id
+          }
+        })
+      });
+
+      if (!cbResponse.ok) {
+        const errorText = await cbResponse.text();
+        throw new Error(`Coinbase Commerce API error: ${cbResponse.status} - ${errorText}`);
+      }
+
+      const cbData = await cbResponse.json();
+      const chargeCode = cbData.data.code;
+      const hostedUrl = cbData.data.hosted_url;
+
+      // Save crypto transaction to SQLite
+      const result = await database.run(
+        'INSERT INTO transactions (merchant_id, external_id, amount, status, payment_method, coinbase_charge_code, webhook_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [req.merchant.id, external_id, baseAmt, 'pending', 'crypto', chargeCode, webhook_url || null]
+      );
+
+      return res.status(201).json({
+        status: 'pending',
+        transaction_id: result.id,
+        external_id: external_id,
+        amount: baseAmt,
+        payment_method: 'crypto',
+        hosted_url: hostedUrl,
+        coinbase_charge_code: chargeCode,
+        created_at: new Date().toISOString()
+      });
+    }
+
+    // Otherwise, default to QRIS flow
     // 1. Dapatkan daftar nominal dari semua transaksi yang sedang pending milik merchant ini
     const pendingTxs = await database.all(
       'SELECT amount FROM transactions WHERE merchant_id = ? AND status = "pending"',
@@ -451,7 +557,7 @@ app.post('/api/v1/charge', authenticateApiKey, async (req, res) => {
     });
   } catch (err) {
     console.error('[Charge API Error]', err.message);
-    res.status(500).json({ status: 'error', message: 'Gagal membuat QRIS dinamis: ' + err.message });
+    res.status(500).json({ status: 'error', message: 'Gagal membuat invoice pembayaran: ' + err.message });
   }
 });
 
@@ -463,7 +569,7 @@ app.get('/api/v1/status/:external_id', authenticateApiKey, async (req, res) => {
 
   try {
     const tx = await database.get(
-      'SELECT status, amount, created_at, updated_at FROM transactions WHERE external_id = ? AND merchant_id = ?',
+      'SELECT status, amount, payment_method, coinbase_charge_code, created_at, updated_at FROM transactions WHERE external_id = ? AND merchant_id = ?',
       [external_id, req.merchant.id]
     );
 
@@ -475,11 +581,86 @@ app.get('/api/v1/status/:external_id', authenticateApiKey, async (req, res) => {
       external_id: external_id,
       status: tx.status,
       amount: tx.amount,
+      payment_method: tx.payment_method || 'qris',
+      coinbase_charge_code: tx.coinbase_charge_code || null,
+      hosted_url: tx.coinbase_charge_code ? `https://commerce.coinbase.com/charges/${tx.coinbase_charge_code}` : null,
       created_at: tx.created_at,
       updated_at: tx.updated_at
     });
   } catch (err) {
     res.status(500).json({ status: 'error', message: 'Gagal mengambil status transaksi' });
+  }
+});
+
+/**
+ * Coinbase Commerce Webhook endpoint
+ */
+app.post('/api/webhooks/coinbase', async (req, res) => {
+  const signature = req.headers['x-cc-webhook-signature'];
+  if (!signature) {
+    return res.status(400).json({ message: 'Missing X-CC-Webhook-Signature header' });
+  }
+
+  try {
+    const event = req.body.event;
+    if (!event || !event.data || !event.data.metadata) {
+      return res.status(400).json({ message: 'Invalid webhook payload structure' });
+    }
+
+    const { merchant_id, external_id } = event.data.metadata;
+    if (!merchant_id) {
+      return res.status(400).json({ message: 'Missing merchant_id in metadata' });
+    }
+
+    // Retrieve merchant to get the webhook shared secret
+    const merchant = await database.get('SELECT * FROM merchants WHERE id = ?', [merchant_id]);
+    if (!merchant) {
+      return res.status(404).json({ message: 'Merchant not found' });
+    }
+
+    if (!merchant.coinbase_webhook_secret) {
+      return res.status(400).json({ message: 'Merchant coinbase_webhook_secret not configured' });
+    }
+
+    // Verify webhook signature using rawBody buffer
+    const bodyToSign = req.rawBody || Buffer.from(JSON.stringify(req.body));
+    const computedSignature = crypto
+      .createHmac('sha256', merchant.coinbase_webhook_secret)
+      .update(bodyToSign)
+      .digest('hex');
+
+    if (computedSignature !== signature) {
+      console.warn(`[Coinbase Webhook] Signature mismatch for merchant #${merchant.id}. Received: ${signature}, Computed: ${computedSignature}`);
+      return res.status(401).json({ message: 'Signature verification failed' });
+    }
+
+    console.log(`[Coinbase Webhook] Signature verified successfully. Event: ${event.type}, Code: ${event.data.code}`);
+
+    // Process payment confirmation
+    if (event.type === 'charge:confirmed') {
+      const tx = await database.get(
+        'SELECT * FROM transactions WHERE coinbase_charge_code = ? AND merchant_id = ?',
+        [event.data.code, merchant.id]
+      );
+
+      if (tx) {
+        if (tx.status === 'pending') {
+          console.log(`[Coinbase Webhook] Payment confirmed for Tx #${tx.id} (External: ${tx.external_id}). Marking as success.`);
+          await checkerService.markTransactionSuccess(tx.id, event.data.id || 'coinbase_ref');
+        } else {
+          console.log(`[Coinbase Webhook] Transaction #${tx.id} is already in status: ${tx.status}. Skipping.`);
+        }
+      } else {
+        console.warn(`[Coinbase Webhook] No matching transaction found for charge code: ${event.data.code}`);
+      }
+    } else {
+      console.log(`[Coinbase Webhook] Received unhandled event type: ${event.type}`);
+    }
+
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('[Coinbase Webhook Error]', err.message);
+    res.status(500).json({ message: 'Internal server error: ' + err.message });
   }
 });
 

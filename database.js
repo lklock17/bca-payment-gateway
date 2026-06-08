@@ -88,6 +88,57 @@ const initDb = async () => {
     // Column already exists
   }
 
+  // Migrate crypto columns for merchants and transactions
+  try {
+    await run("ALTER TABLE merchants ADD COLUMN crypto_address TEXT");
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    await run("ALTER TABLE transactions ADD COLUMN payment_method TEXT DEFAULT 'qris'");
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    await run("ALTER TABLE transactions ADD COLUMN crypto_amount REAL");
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    await run("ALTER TABLE transactions ADD COLUMN crypto_rate REAL");
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    await run("ALTER TABLE transactions ADD COLUMN crypto_tx_hash TEXT");
+    await run("CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_crypto_hash ON transactions(crypto_tx_hash)");
+  } catch (e) {
+    // Column/index already exists
+  }
+
+  try {
+    await run("ALTER TABLE merchants ADD COLUMN coinbase_api_key TEXT");
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    await run("ALTER TABLE merchants ADD COLUMN coinbase_webhook_secret TEXT");
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    await run("ALTER TABLE transactions ADD COLUMN coinbase_charge_code TEXT");
+    await run("CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_coinbase_code ON transactions(coinbase_charge_code)");
+  } catch (e) {
+    // Column/index already exists
+  }
+
   // Seed default admin if table is empty
   const adminExists = await get('SELECT id FROM users WHERE email = ?', ['admin@gateway.com']);
   if (!adminExists) {
