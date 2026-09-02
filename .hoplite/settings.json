@@ -7,7 +7,7 @@
 	"scripts": {
 		"setup": {
 			"enabled": true,
-			"command": "npm install"
+			"command": "apt-get install -y git-lfs && npm install"
 		},
 		"run": {
 			"enabled": true,
