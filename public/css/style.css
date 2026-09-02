@@ -596,3 +596,85 @@ h1, h2, h3, h4, h5, h6 {
     opacity: 1;
   }
 }
+
+/* Responsive: collapse the fixed sidebar into a top bar on small screens */
+@media (max-width: 900px) {
+  .dashboard-wrapper {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 16px;
+    border-right: none;
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  .sidebar-logo {
+    margin-bottom: 0;
+    font-size: 1.1rem;
+  }
+
+  .sidebar-menu {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .sidebar-item a {
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+
+  .sidebar-item.active a {
+    border-left: none;
+    border-bottom: 3px solid var(--accent-color);
+  }
+
+  .sidebar-footer {
+    margin-top: 0;
+    padding-top: 0;
+  }
+
+  .sidebar-footer .btn-block {
+    width: auto;
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 24px 16px;
+  }
+
+  .dashboard-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .row-header,
+  .dashboard-card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .modal-content {
+    padding: 24px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .toast-container {
+    left: 16px;
+  }
+
+  .toast {
+    min-width: 0;
+    width: 100%;
+  }
+}
