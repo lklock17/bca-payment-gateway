@@ -39,16 +39,117 @@ function parseQRIS(qrisStr) {
   return tags;
 }
 
+const KNOWN_ACQUIRER_NAMES = {
+  'ID.CO.BCA.WWW': 'BCA',
+  'ID.DANA.WWW': 'DANA',
+  'ID.CO.BRI.WWW': 'BRI',
+  'ID.CO.BANKMANDIRI.WWW': 'Mandiri',
+  'ID.CO.BNI.WWW': 'BNI',
+  'ID.CO.CIMBNIAGA.WWW': 'CIMB Niaga',
+  'ID.CO.SHOPEE.WWW': 'ShopeePay',
+  'ID.CO.GOPAY.WWW': 'GoPay',
+  'ID.OVO.WWW': 'OVO',
+  'ID.LINKAJA.WWW': 'LinkAja'
+};
+
+function inspectAcquirers(qrisStr) {
+  if (!qrisStr || typeof qrisStr !== 'string') return [];
+  const tags = parseQRIS(qrisStr.trim());
+  const list = [];
+  for (let tagNum = 26; tagNum <= 45; tagNum++) {
+    const tagKey = String(tagNum);
+    if (!tags[tagKey]) continue;
+    const subTags = parseQRIS(tags[tagKey]);
+    const domain = (subTags['00'] || '').trim().toUpperCase();
+    const merchantPan = subTags['01'] || '';
+    const merchantId = subTags['02'] || '';
+    const friendlyName =
+      KNOWN_ACQUIRER_NAMES[domain] ||
+      (domain.includes('BCA') ? 'BCA' :
+      domain.includes('DANA') ? 'DANA' :
+      domain.includes('BRI') ? 'BRI' :
+      domain.includes('MANDIRI') ? 'Mandiri' :
+      domain.includes('BNI') ? 'BNI' :
+      domain || `Acquirer #${tagKey}`);
+    list.push({
+      tag: tagKey,
+      domain,
+      name: friendlyName,
+      pan: merchantPan,
+      merchant_id: merchantId,
+      raw: tags[tagKey]
+    });
+  }
+  return list;
+}
+
+function rebuildQRISFromTags(tags) {
+  delete tags['63'];
+  let rebuilt = '';
+  const sortedTags = Object.keys(tags).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+  for (const tag of sortedTags) {
+    const value = tags[tag];
+    if (value === undefined || value === null || value === '') continue;
+    const length = value.length.toString().padStart(2, '0');
+    rebuilt += `${tag}${length}${value}`;
+  }
+  rebuilt += '6304';
+  const crc = calculateCRC16(rebuilt);
+  return rebuilt + crc;
+}
+
+/**
+ * Filters a multi-acquirer QRIS string to route payments exclusively to a chosen acquirer
+ * ('bca', 'dana', or 'multi'/'all'). Default 'bca' keeps ONLY BCA in Tag 26 so all payments
+ * land in KlikBCA Merchant mutation logs for automatic verification.
+ */
+function filterQrisAcquirer(qrisStr, mode = 'bca') {
+  if (!qrisStr || typeof qrisStr !== 'string') return qrisStr;
+  const normMode = String(mode || 'bca').trim().toLowerCase();
+  if (normMode === 'multi' || normMode === 'all') {
+    return qrisStr.trim();
+  }
+
+  const tags = parseQRIS(qrisStr.trim());
+  const acquirers = inspectAcquirers(qrisStr);
+  if (acquirers.length <= 1) {
+    return qrisStr.trim();
+  }
+
+  let matched = null;
+  if (normMode === 'bca') {
+    matched = acquirers.find(a => a.domain.includes('BCA'));
+  } else if (normMode === 'dana') {
+    matched = acquirers.find(a => a.domain.includes('DANA'));
+  } else {
+    matched = acquirers.find(a => a.domain === normMode.toUpperCase() || a.name.toLowerCase() === normMode);
+  }
+
+  if (!matched) {
+    return qrisStr.trim();
+  }
+
+  for (let tagNum = 26; tagNum <= 45; tagNum++) {
+    delete tags[String(tagNum)];
+  }
+  tags['26'] = matched.raw;
+
+  return rebuildQRISFromTags(tags);
+}
+
 /**
  * Generates a dynamic QRIS string with a specific amount from a static QRIS base.
  */
-function generateDynamicQRIS(staticQRIS, amount) {
+function generateDynamicQRIS(staticQRIS, amount, acquirerMode = 'bca') {
   if (!staticQRIS) {
     throw new Error('Static QRIS string is empty');
   }
 
+  // Apply acquirer filter first (default: BCA only so payments hit KlikBCA)
+  const routedStatic = filterQrisAcquirer(staticQRIS.trim(), acquirerMode);
+
   // Parse original tags
-  const tags = parseQRIS(staticQRIS.trim());
+  const tags = parseQRIS(routedStatic);
 
   // 1. Set Point of Initiation Method to 12 (Dynamic)
   tags['01'] = '12';
@@ -58,35 +159,33 @@ function generateDynamicQRIS(staticQRIS, amount) {
   const amountStr = Math.round(amount).toString();
   tags['54'] = amountStr;
 
-  // Remove existing CRC tag (63) if present to compute it fresh
-  delete tags['63'];
-
-  // 3. Rebuild QRIS string in numerical tag order
-  let rebuilt = '';
-  const sortedTags = Object.keys(tags).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
-  
-  for (const tag of sortedTags) {
-    const value = tags[tag];
-    const length = value.length.toString().padStart(2, '0');
-    rebuilt += `${tag}${length}${value}`;
-  }
-
-  // 4. Append Tag 63 (CRC16) with length 04
-  rebuilt += '6304';
-
-  // 5. Calculate and append CRC16 checksum
-  const crc = calculateCRC16(rebuilt);
-  return rebuilt + crc;
+  return rebuildQRISFromTags(tags);
 }
 
 let browserInstance = null;
+let cachedPuppeteer = null;
+
+async function getPuppeteerLib() {
+  if (cachedPuppeteer) return cachedPuppeteer;
+  try {
+    cachedPuppeteer = require('puppeteer');
+  } catch (err) {
+    if (err && err.code === 'ERR_REQUIRE_ESM') {
+      const mod = await import('puppeteer');
+      cachedPuppeteer = mod.default || mod;
+    } else {
+      throw err;
+    }
+  }
+  return cachedPuppeteer;
+}
 
 async function getBrowser() {
   if (browserInstance && browserInstance.process() && !browserInstance.process().killed) {
     return browserInstance;
   }
   try {
-    const puppeteer = require('puppeteer');
+    const puppeteer = await getPuppeteerLib();
     browserInstance = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -96,6 +195,17 @@ async function getBrowser() {
     console.warn('[QRIS Image Generator] Puppeteer not available, using raw QR code fallback:', err.message);
     return null;
   }
+}
+
+function validateQRIS(qrisStr) {
+  if (!qrisStr || typeof qrisStr !== 'string') return false;
+  const trimmed = qrisStr.trim();
+  if (!trimmed.startsWith('000201') || trimmed.length < 30) return false;
+  const crcTagIdx = trimmed.lastIndexOf('6304');
+  if (crcTagIdx === -1 || crcTagIdx + 8 !== trimmed.length) return false;
+  const payloadWithoutCrc = trimmed.slice(0, crcTagIdx + 4);
+  const actualCrc = trimmed.slice(crcTagIdx + 4).toUpperCase();
+  return calculateCRC16(payloadWithoutCrc) === actualCrc;
 }
 
 function extractNmid(qrisStr) {
@@ -228,6 +338,10 @@ async function generateQRISImage(qrisStr) {
 module.exports = {
   calculateCRC16,
   parseQRIS,
+  validateQRIS,
+  extractNmid,
+  inspectAcquirers,
+  filterQrisAcquirer,
   generateDynamicQRIS,
   generateQRISImage
 };

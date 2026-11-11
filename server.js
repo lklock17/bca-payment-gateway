@@ -1,32 +1,49 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+
+const {
+  loadDotEnv,
+  getEnvConfig,
+  getPublicEnvStatus,
+  updateDotEnvStaticQris
+} = require('./backend/config/env');
+
+// Load environment configuration
+loadDotEnv();
+let envConfig = getEnvConfig();
 
 const database = require('./database');
 const qrisUtil = require('./utils/qris');
 const checkerService = require('./services/bcaChecker');
 const bcaScraper = require('./services/bcaScraper');
-const cryptoRates = require('./utils/cryptoRates');
-const coinbasePersonal = require('./utils/coinbasePersonal');
+const { createAuthHelpers } = require('./backend/middlewares/auth');
+const {
+  requireAdmin,
+  createUserMgmtWritableMiddleware
+} = require('./backend/middlewares/rbac');
 
 const app = express();
-const PORT = process.env.PORT || 3005;
+const PORT = envConfig.port;
 
 // Global Log Buffer for Admin Dashboard Console Widget
 const logBuffer = [];
 const MAX_LOGS = 100;
 
 function addLog(type, args) {
-  const timestamp = new Date().toLocaleTimeString('id-ID', { 
-    timeZone: 'Asia/Jakarta', 
-    hour: '2-digit', 
-    minute: '2-digit', 
-    second: '2-digit', 
-    hour12: false 
+  const timestamp = new Date().toLocaleTimeString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
   });
-  const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ');
+  const message = args
+    .map((arg) => (typeof arg === 'object' ? JSON.stringify(arg) : arg))
+    .join(' ');
   logBuffer.unshift({ timestamp, type, message });
   if (logBuffer.length > MAX_LOGS) {
     logBuffer.pop();
@@ -50,63 +67,49 @@ console.error = (...args) => {
   originalError(...args);
 };
 
-// Token Secret generation
-const JWT_SECRET = crypto.randomBytes(32).toString('hex');
+// Fallback runtime JWT secret if not configured in .env
+const runtimeJwtSecret =
+  envConfig.jwt_secret || crypto.randomBytes(32).toString('hex');
 
-function generateToken(user) {
-  const payload = { id: user.id, email: user.email, role: user.role };
-  const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = crypto.createHmac('sha256', JWT_SECRET).update(encoded).digest('base64url');
-  return `${encoded}.${signature}`;
-}
+const { generateToken, authenticateToken } = createAuthHelpers({
+  database,
+  jwtSecret: runtimeJwtSecret,
+  jwtExpiresHours: envConfig.jwt_expires_hours
+});
 
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  if (!token) return res.status(401).json({ message: 'Token otentikasi diperlukan' });
+const requireUserMgmtWritable = createUserMgmtWritableMiddleware(() => getEnvConfig());
 
-  try {
-    const [encoded, signature] = token.split('.');
-    const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(encoded).digest('base64url');
-    
-    if (signature !== expectedSignature) {
-      return res.status(401).json({ message: 'Token tidak valid atau kedaluwarsa' });
-    }
-    
-    const user = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
-    req.user = user;
-    next();
-  } catch (err) {
-    return res.status(401).json({ message: 'Token tidak valid' });
-  }
-}
-
-function requireAdmin(req, res, next) {
-  if (req.user && req.user.role === 'admin') {
-    next();
-  } else {
-    res.status(403).json({ message: 'Akses ditolak: Memerlukan hak akses Admin' });
-  }
-}
-
-// Middleware
+// Express Middleware
 app.use(cors());
-app.use(express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf;
-  }
-}));
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    }
+  })
+);
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
 
-// Root redirect
+// Root redirect & production-safe index.html serving
 app.get('/', (req, res) => {
   res.redirect('/index.html');
 });
 
+app.get('/index.html', (req, res) => {
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  if (envConfig.node_env === 'production') {
+    let html = fs.readFileSync(indexPath, 'utf8');
+    html = html.replace(/<!-- DEMO_HINT_START -->[\s\S]*?<!-- DEMO_HINT_END -->/g, '');
+    html = html.replace(/<!-- DEMO_SCRIPT_START -->[\s\S]*?<!-- DEMO_SCRIPT_END -->/g, '');
+    return res.type('html').send(html);
+  }
+  res.sendFile(indexPath);
+});
+
+app.use(express.static(path.join(__dirname, 'public')));
+
 // ==========================================
-// 1. AUTHENTICATION ROUTE
+// 1. AUTHENTICATION ROUTES
 // ==========================================
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
@@ -115,9 +118,13 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   try {
-    const user = await database.get('SELECT * FROM users WHERE email = ?', [email]);
+    const user = await database.get('SELECT * FROM users WHERE LOWER(email) = LOWER(?)', [email.trim()]);
     if (!user) {
       return res.status(400).json({ message: 'Email atau password salah' });
+    }
+
+    if (user.is_active === 0) {
+      return res.status(403).json({ message: 'Akun Anda telah dinonaktifkan. Hubungi administrator.' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -125,11 +132,72 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ message: 'Email atau password salah' });
     }
 
-    const token = generateToken(user);
-    res.json({ token, email: user.email, role: user.role });
+    const tokenData = generateToken(user);
+
+    // Save session audit record to database
+    const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || null;
+    const userAgent = req.headers['user-agent'] || null;
+    await database.run(
+      `INSERT INTO sessions (user_id, token_jti, ip_address, user_agent, expires_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [user.id, tokenData.jti, ipAddress, userAgent, tokenData.expiresAt]
+    );
+
+    // Update user's last login timestamp
+    await database.run(
+      'UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [user.id]
+    );
+
+    res.json({
+      token: tokenData.token,
+      email: user.email,
+      role: user.role,
+      is_primary_admin: Boolean(user.is_primary_admin),
+      expires_at: tokenData.expiresAt
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const user = await database.get(
+      'SELECT id, email, role, is_primary_admin, managed_by_env, is_active, created_at, last_login_at FROM users WHERE id = ?',
+      [req.user.id]
+    );
+    if (!user) {
+      return res.status(404).json({ message: 'User tidak ditemukan' });
+    }
+    res.json({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      is_primary_admin: Boolean(user.is_primary_admin),
+      managed_by_env: Boolean(user.managed_by_env),
+      is_active: Boolean(user.is_active),
+      created_at: user.created_at,
+      last_login_at: user.last_login_at
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Gagal memuat data profil' });
+  }
+});
+
+app.post('/api/auth/logout', authenticateToken, async (req, res) => {
+  try {
+    if (req.user && req.user.jti) {
+      await database.run(
+        'UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP WHERE token_jti = ? AND user_id = ?',
+        [req.user.jti, req.user.id]
+      );
+    }
+    res.json({ message: 'Sesi berhasil diakhiri' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Gagal melakukan logout' });
   }
 });
 
@@ -138,59 +206,67 @@ app.post('/api/auth/login', async (req, res) => {
 // ==========================================
 app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const users = await database.all('SELECT id, email, role, created_at FROM users');
-    res.json(users);
+    const users = await database.all(
+      `SELECT id, email, role, is_primary_admin, managed_by_env, is_active, created_at, last_login_at
+         FROM users
+        ORDER BY is_primary_admin DESC, id ASC`
+    );
+    const sanitized = users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      role: u.role,
+      is_primary_admin: Boolean(u.is_primary_admin),
+      managed_by_env: Boolean(u.managed_by_env),
+      is_active: Boolean(u.is_active),
+      created_at: u.created_at,
+      last_login_at: u.last_login_at
+    }));
+    res.json(sanitized);
   } catch (err) {
     res.status(500).json({ message: 'Gagal mengambil data user' });
   }
 });
 
-app.post('/api/users', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/api/users', authenticateToken, requireAdmin, requireUserMgmtWritable, async (req, res) => {
   const { email, password, role } = req.body;
   if (!email || !password) {
     return res.status(400).json({ message: 'Email dan password harus diisi' });
   }
 
+  const cleanEmail = email.trim().toLowerCase();
+  const targetRole = role === 'admin' ? 'admin' : 'user';
+
   try {
-    const userExists = await database.get('SELECT id FROM users WHERE email = ?', [email]);
+    const userExists = await database.get('SELECT id FROM users WHERE LOWER(email) = ?', [cleanEmail]);
     if (userExists) {
       return res.status(400).json({ message: 'Email sudah terdaftar' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await database.run(
-      'INSERT INTO users (email, password, role) VALUES (?, ?, ?)',
-      [email, hashedPassword, role || 'user']
+    const rounds = envConfig.bcrypt_rounds || 10;
+    const hashedPassword = await bcrypt.hash(password, rounds);
+    const roleRow = await database.get('SELECT id FROM roles WHERE name = ?', [targetRole]);
+
+    const result = await database.run(
+      `INSERT INTO users (email, password, role, role_id, is_primary_admin, managed_by_env, is_active, updated_at)
+       VALUES (?, ?, ?, ?, 0, 0, 1, CURRENT_TIMESTAMP)`,
+      [cleanEmail, hashedPassword, targetRole, roleRow ? roleRow.id : null]
     );
-    res.status(201).json({ message: 'User berhasil dibuat' });
+    res.status(201).json({ message: 'User berhasil dibuat', id: result.id });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Gagal membuat user baru' });
   }
 });
 
-app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.put('/api/users/:id', authenticateToken, requireAdmin, requireUserMgmtWritable, async (req, res) => {
   const { id } = req.params;
-  try {
-    const user = await database.get('SELECT email FROM users WHERE id = ?', [id]);
-    if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
-    if (user.email === 'admin@gateway.com') {
-      return res.status(400).json({ message: 'Akun admin utama tidak dapat dihapus' });
-    }
-
-    await database.run('DELETE FROM users WHERE id = ?', [id]);
-    res.json({ message: 'User berhasil dihapus' });
-  } catch (err) {
-    res.status(500).json({ message: 'Gagal menghapus user' });
-  }
-});
-
-app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
-  const { id } = req.params;
-  const { email, password, role } = req.body;
+  const { email, password, role, is_active } = req.body;
 
   if (!email) {
     return res.status(400).json({ message: 'Email harus diisi' });
   }
+
+  const cleanEmail = email.trim().toLowerCase();
 
   try {
     const user = await database.get('SELECT * FROM users WHERE id = ?', [id]);
@@ -198,26 +274,51 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(404).json({ message: 'User tidak ditemukan' });
     }
 
-    // Prevent changing primary admin role
-    if (user.email === 'admin@gateway.com' && role !== 'admin') {
-      return res.status(400).json({ message: 'Akun admin utama harus tetap memiliki role Admin' });
+    // Protection for Primary Admin
+    if (user.is_primary_admin === 1) {
+      if (role && role !== 'admin') {
+        return res.status(400).json({ message: 'Akun Administrator utama harus tetap memiliki role Admin' });
+      }
+      if (is_active === 0 || is_active === false) {
+        return res.status(400).json({ message: 'Akun Administrator utama tidak dapat dinonaktifkan' });
+      }
     }
 
-    // Check if email already taken
-    if (email !== user.email) {
-      const emailExists = await database.get('SELECT id FROM users WHERE email = ? AND id != ?', [email, id]);
+    // Protection for Env-Managed Users when locked
+    const currentEnvConfig = getEnvConfig();
+    if (user.managed_by_env === 1 && currentEnvConfig.lock_env_managed_users) {
+      if (cleanEmail !== user.email.toLowerCase()) {
+        return res.status(400).json({
+          message: 'Email akun yang dikelola oleh file .env tidak dapat diubah via Dashboard. Ubah di file .env server.'
+        });
+      }
+      if (password && password.trim() !== '') {
+        return res.status(400).json({
+          message: 'Password akun yang dikelola oleh file .env diproteksi dari pengubahan via UI. Ubah di file .env server.'
+        });
+      }
+    }
+
+    // Check duplicate email
+    if (cleanEmail !== user.email.toLowerCase()) {
+      const emailExists = await database.get('SELECT id FROM users WHERE LOWER(email) = ? AND id != ?', [cleanEmail, id]);
       if (emailExists) {
         return res.status(400).json({ message: 'Email sudah digunakan oleh user lain' });
       }
     }
 
-    let query = 'UPDATE users SET email = ?, role = ? WHERE id = ?';
-    let params = [email, role || 'user', id];
+    const nextRole = role === 'admin' ? 'admin' : (role === 'user' ? 'user' : user.role);
+    const roleRow = await database.get('SELECT id FROM roles WHERE name = ?', [nextRole]);
+    const nextActive = is_active !== undefined ? (is_active ? 1 : 0) : user.is_active;
+
+    let query = 'UPDATE users SET email = ?, role = ?, role_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
+    let params = [cleanEmail, nextRole, roleRow ? roleRow.id : user.role_id, nextActive, id];
 
     if (password && password.trim() !== '') {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      query = 'UPDATE users SET email = ?, password = ?, role = ? WHERE id = ?';
-      params = [email, hashedPassword, role || 'user', id];
+      const rounds = envConfig.bcrypt_rounds || 10;
+      const hashedPassword = await bcrypt.hash(password, rounds);
+      query = 'UPDATE users SET email = ?, password = ?, role = ?, role_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
+      params = [cleanEmail, hashedPassword, nextRole, roleRow ? roleRow.id : user.role_id, nextActive, id];
     }
 
     await database.run(query, params);
@@ -228,26 +329,115 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+app.delete('/api/users/:id', authenticateToken, requireAdmin, requireUserMgmtWritable, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const user = await database.get('SELECT * FROM users WHERE id = ?', [id]);
+    if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
+
+    if (user.is_primary_admin === 1) {
+      return res.status(400).json({ message: 'Akun Administrator utama tidak dapat dihapus' });
+    }
+
+    if (Number(user.id) === Number(req.user.id)) {
+      return res.status(400).json({ message: 'Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif' });
+    }
+
+    const currentEnvConfig = getEnvConfig();
+    if (user.managed_by_env === 1 && currentEnvConfig.lock_env_managed_users) {
+      return res.status(400).json({
+        message: 'Akun ini dikelola oleh file .env dan diproteksi dari penghapusan via Dashboard UI.'
+      });
+    }
+
+    await database.run('DELETE FROM users WHERE id = ?', [id]);
+    res.json({ message: 'User berhasil dihapus' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Gagal menghapus user' });
+  }
+});
+
 // ==========================================
-// 3. MERCHANT MANAGEMENT
+// 3. SYSTEM & ENV CONFIGURATION STATUS
+// ==========================================
+app.get('/api/system/env-status', authenticateToken, (req, res) => {
+  envConfig = getEnvConfig();
+  const status = getPublicEnvStatus(envConfig);
+  res.json(status);
+});
+
+// ==========================================
+// 4. MERCHANT MANAGEMENT
 // ==========================================
 app.get('/api/merchants', authenticateToken, async (req, res) => {
   try {
-    const merchants = await database.all('SELECT id, name, bca_user, bca_pass, static_qris, crypto_address, coinbase_api_key, coinbase_webhook_secret, status, api_key, created_at FROM merchants');
-    
-    // Attach session status to each merchant
-    const merchantsWithStatus = merchants.map(m => {
+    envConfig = getEnvConfig();
+    const isAdmin = req.user && req.user.role === 'admin';
+    const merchants = await database.all(
+      isAdmin
+        ? 'SELECT id, name, bca_user, bca_pass, static_qris, qris_acquirer, status, api_key, created_at FROM merchants'
+        : 'SELECT id, name, bca_user, static_qris, qris_acquirer, status, api_key, created_at FROM merchants'
+    );
+
+    const merchantsWithStatus = merchants.map((m) => {
+      const effectiveBcaUser = m.bca_user || envConfig.bca_user || null;
       let bcaStatus = { status: 'disconnected', error: null };
-      if (m.bca_user) {
-        bcaStatus = bcaScraper.getSessionStatus(m.bca_user);
+      if (effectiveBcaUser) {
+        bcaStatus = bcaScraper.getSessionStatus(effectiveBcaUser);
       }
-      return { 
-        ...m, 
-        bca_status: bcaStatus.status, 
-        bca_error: bcaStatus.error 
+
+      const effectiveStaticQris = m.static_qris || envConfig.static_qris || '';
+      const hasStaticQris = Boolean(effectiveStaticQris);
+      const hasBcaPass = Boolean(m.bca_pass || envConfig.bca_pass);
+      const isUsingEnvBca = !m.bca_user && Boolean(envConfig.bca_user);
+      const detectedAcquirers = effectiveStaticQris
+        ? qrisUtil.inspectAcquirers(effectiveStaticQris).map((a) => ({ tag: a.tag, domain: a.domain, name: a.name }))
+        : [];
+      const qrisAcquirer = m.qris_acquirer || 'bca';
+
+      if (!isAdmin) {
+        const maskedApiKey = m.api_key
+          ? `${m.api_key.slice(0, 10)}••••`
+          : null;
+        let maskedBcaUser = null;
+        if (m.bca_user) {
+          maskedBcaUser = getPublicEnvStatus(envConfig).bca_user_masked;
+        } else if (envConfig.bca_user) {
+          maskedBcaUser = `${getPublicEnvStatus(envConfig).bca_user_masked} (via .env)`;
+        }
+        return {
+          id: m.id,
+          name: m.name,
+          bca_user: maskedBcaUser,
+          bca_pass: null,
+          static_qris: null,
+          qris_acquirer: qrisAcquirer,
+          detected_acquirers: detectedAcquirers,
+          has_static_qris: hasStaticQris,
+          has_bca_pass: hasBcaPass,
+          is_using_env_bca: isUsingEnvBca,
+          status: m.status,
+          api_key: maskedApiKey,
+          created_at: m.created_at,
+          bca_status: bcaStatus.status,
+          bca_error: bcaStatus.error
+        };
+      }
+
+      return {
+        ...m,
+        qris_acquirer: qrisAcquirer,
+        detected_acquirers: detectedAcquirers,
+        bca_pass: null,
+        has_static_qris: hasStaticQris,
+        has_bca_pass: hasBcaPass,
+        is_using_env_bca: isUsingEnvBca,
+        bca_status: bcaStatus.status,
+        bca_error: bcaStatus.error
       };
     });
-    
+
     res.json(merchantsWithStatus);
   } catch (err) {
     console.error(err);
@@ -256,37 +446,51 @@ app.get('/api/merchants', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/merchants', authenticateToken, requireAdmin, async (req, res) => {
-  const { name, bca_user, bca_pass, static_qris, crypto_address, coinbase_api_key, coinbase_webhook_secret } = req.body;
-  if (!name) {
+  const { name, bca_user, bca_pass, static_qris, qris_acquirer } = req.body || {};
+  const trimmedName = typeof name === 'string' ? name.trim() : '';
+  if (!trimmedName) {
     return res.status(400).json({ message: 'Nama merchant wajib diisi' });
   }
 
-  const hasBca = bca_user && bca_pass && static_qris;
-  const hasCoinbase = coinbase_api_key && coinbase_webhook_secret;
-  const hasDirectCrypto = crypto_address;
+  const cleanBcaUser = typeof bca_user === 'string' && bca_user.trim() !== '' ? bca_user.trim() : null;
+  const cleanBcaPass = typeof bca_pass === 'string' && bca_pass.trim() !== '' ? bca_pass : null;
+  const cleanStaticQris = typeof static_qris === 'string' && static_qris.trim() !== '' ? static_qris.trim() : null;
+  const cleanAcquirer = ['bca', 'dana', 'multi'].includes(String(qris_acquirer || '').toLowerCase())
+    ? String(qris_acquirer).toLowerCase()
+    : 'bca';
 
-  if (!hasBca && !hasCoinbase && !hasDirectCrypto) {
-    return res.status(400).json({ message: 'Kredensial KlikBCA, Coinbase Commerce, atau Alamat Crypto Wallet wajib diisi salah satu' });
+  const effectiveUser = cleanBcaUser || envConfig.bca_user;
+  const effectivePass = cleanBcaPass || envConfig.bca_pass;
+
+  if (!effectiveUser || !effectivePass) {
+    return res.status(400).json({
+      message: 'Kredensial KlikBCA (User dan Password) wajib diisi atau diset di file .env'
+    });
   }
 
   try {
-    // Generate unique API Key (like midtrans server key)
     const apiKey = 'BCA-GW-' + crypto.randomBytes(16).toString('hex').toUpperCase();
-    
-    await database.run(
-      'INSERT INTO merchants (name, bca_user, bca_pass, static_qris, crypto_address, coinbase_api_key, coinbase_webhook_secret, api_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+
+    const result = await database.run(
+      'INSERT INTO merchants (name, bca_user, bca_pass, static_qris, qris_acquirer, api_key, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
-        name, 
-        bca_user || null, 
-        bca_pass || null, 
-        static_qris || null, 
-        crypto_address || null, 
-        coinbase_api_key || null, 
-        coinbase_webhook_secret || null, 
-        apiKey
+        trimmedName,
+        cleanBcaUser,
+        cleanBcaPass,
+        cleanStaticQris,
+        cleanAcquirer,
+        apiKey,
+        req.user.id
       ]
     );
-    res.status(201).json({ message: 'Merchant berhasil ditambahkan' });
+    res.status(201).json({
+      message: 'Merchant berhasil ditambahkan',
+      id: result.id,
+      name: trimmedName,
+      api_key: apiKey,
+      qris_acquirer: cleanAcquirer,
+      has_static_qris: Boolean(cleanStaticQris || envConfig.static_qris)
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Gagal menambahkan merchant' });
@@ -295,34 +499,47 @@ app.post('/api/merchants', authenticateToken, requireAdmin, async (req, res) => 
 
 app.put('/api/merchants/:id', authenticateToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { name, bca_user, bca_pass, static_qris, crypto_address, coinbase_api_key, coinbase_webhook_secret } = req.body;
+  const { name, bca_user, bca_pass, static_qris, qris_acquirer } = req.body || {};
+  const trimmedName = typeof name === 'string' ? name.trim() : '';
 
-  if (!name) {
+  if (!trimmedName) {
     return res.status(400).json({ message: 'Nama merchant wajib diisi' });
   }
 
-  const hasBca = bca_user && bca_pass && static_qris;
-  const hasCoinbase = coinbase_api_key && coinbase_webhook_secret;
-  const hasDirectCrypto = crypto_address;
-
-  if (!hasBca && !hasCoinbase && !hasDirectCrypto) {
-    return res.status(400).json({ message: 'Kredensial KlikBCA, Coinbase Commerce, atau Alamat Crypto Wallet wajib diisi salah satu' });
-  }
-
   try {
-    const merchant = await database.get('SELECT id FROM merchants WHERE id = ?', [id]);
+    const merchant = await database.get('SELECT * FROM merchants WHERE id = ?', [id]);
     if (!merchant) return res.status(404).json({ message: 'Merchant tidak ditemukan' });
 
+    const finalBcaUser = bca_user !== undefined
+      ? (typeof bca_user === 'string' && bca_user.trim() !== '' ? bca_user.trim() : null)
+      : merchant.bca_user;
+    const finalBcaPass = (typeof bca_pass === 'string' && bca_pass.trim() !== '')
+      ? bca_pass
+      : merchant.bca_pass;
+    const finalStaticQris = static_qris !== undefined
+      ? (typeof static_qris === 'string' && static_qris.trim() !== '' ? static_qris.trim() : null)
+      : merchant.static_qris;
+    const finalAcquirer = qris_acquirer !== undefined && ['bca', 'dana', 'multi'].includes(String(qris_acquirer).toLowerCase())
+      ? String(qris_acquirer).toLowerCase()
+      : (merchant.qris_acquirer || 'bca');
+
+    const effectiveUser = finalBcaUser || envConfig.bca_user;
+    const effectivePass = finalBcaPass || envConfig.bca_pass;
+
+    if (!effectiveUser || !effectivePass) {
+      return res.status(400).json({
+        message: 'Kredensial KlikBCA (User dan Password) wajib diisi atau diset di file .env'
+      });
+    }
+
     await database.run(
-      'UPDATE merchants SET name = ?, bca_user = ?, bca_pass = ?, static_qris = ?, crypto_address = ?, coinbase_api_key = ?, coinbase_webhook_secret = ? WHERE id = ?',
+      'UPDATE merchants SET name = ?, bca_user = ?, bca_pass = ?, static_qris = ?, qris_acquirer = ? WHERE id = ?',
       [
-        name, 
-        bca_user || null, 
-        bca_pass || null, 
-        static_qris || null, 
-        crypto_address || null, 
-        coinbase_api_key || null, 
-        coinbase_webhook_secret || null, 
+        trimmedName,
+        finalBcaUser,
+        finalBcaPass,
+        finalStaticQris,
+        finalAcquirer,
         id
       ]
     );
@@ -339,7 +556,6 @@ app.delete('/api/merchants/:id', authenticateToken, requireAdmin, async (req, re
     const merchant = await database.get('SELECT id FROM merchants WHERE id = ?', [id]);
     if (!merchant) return res.status(404).json({ message: 'Merchant tidak ditemukan' });
 
-    // Also delete associated transactions
     await database.run('DELETE FROM transactions WHERE merchant_id = ?', [id]);
     await database.run('DELETE FROM merchants WHERE id = ?', [id]);
     res.json({ message: 'Merchant beserta transaksinya berhasil dihapus' });
@@ -348,14 +564,57 @@ app.delete('/api/merchants/:id', authenticateToken, requireAdmin, async (req, re
   }
 });
 
+app.post('/api/merchants/:id/sync-qris', authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const merchant = await database.get('SELECT * FROM merchants WHERE id = ?', [id]);
+    if (!merchant) {
+      return res.status(404).json({ message: 'Merchant tidak ditemukan' });
+    }
+
+    const currentEnv = getEnvConfig();
+    const bcaUser = merchant.bca_user || currentEnv.bca_user;
+    const bcaPass = merchant.bca_pass || currentEnv.bca_pass;
+
+    if (!bcaUser || !bcaPass) {
+      return res.status(400).json({
+        message: 'Kredensial KlikBCA (User dan Password) belum dikonfigurasi untuk merchant ini atau di .env.'
+      });
+    }
+
+    const staticQris = await bcaScraper.fetchStaticQris(bcaUser, bcaPass);
+    if (!staticQris || !qrisUtil.validateQRIS(staticQris)) {
+      return res.status(422).json({
+        message: 'Hasil decode QRIS dari KlikBCA tidak valid atau gagal checksum CRC16.'
+      });
+    }
+
+    await database.run('UPDATE merchants SET static_qris = ? WHERE id = ?', [staticQris, id]);
+    updateDotEnvStaticQris(staticQris);
+    envConfig = getEnvConfig();
+
+    res.json({
+      message: 'QRIS Statis berhasil disinkronkan dari portal KlikBCA dan disimpan ke DB serta .env!',
+      static_qris: staticQris,
+      has_static_qris: true,
+      env_updated: true
+    });
+  } catch (err) {
+    console.error('[Sync QRIS Error]', err);
+    res.status(500).json({
+      message: 'Gagal menarik QRIS Statis dari KlikBCA: ' + (err.message || 'Unknown error')
+    });
+  }
+});
+
 // ==========================================
-// 4. TRANSACTION & STATUS ROUTES
+// 5. TRANSACTION & STATUS ROUTES
 // ==========================================
 app.get('/api/transactions', authenticateToken, async (req, res) => {
   const { limit } = req.query;
   try {
     let query = `
-      SELECT t.*, m.name as merchant_name, m.crypto_address 
+      SELECT t.*, m.name as merchant_name 
       FROM transactions t
       JOIN merchants m ON t.merchant_id = m.id
       ORDER BY t.created_at DESC
@@ -372,7 +631,7 @@ app.get('/api/transactions', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/transactions/:id/simulate-payment', authenticateToken, async (req, res) => {
+app.post('/api/transactions/:id/simulate-payment', authenticateToken, requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const tx = await database.get('SELECT status FROM transactions WHERE id = ?', [id]);
@@ -407,15 +666,13 @@ app.get('/api/stats', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/logs', authenticateToken, (req, res) => {
+app.get('/api/logs', authenticateToken, requireAdmin, (req, res) => {
   res.json(logBuffer);
 });
 
 // ==========================================
-// 5. PUBLIC API (INTEGRASI MERCHANT STORE)
+// 6. PUBLIC API (INTEGRASI MERCHANT STORE)
 // ==========================================
-
-// Middleware for Store API Key verification
 async function authenticateApiKey(req, res, next) {
   const authHeader = req.headers['authorization'];
   const apiKey = authHeader && authHeader.split(' ')[1];
@@ -436,103 +693,57 @@ async function authenticateApiKey(req, res, next) {
   }
 }
 
-/**
- * Charge endpoint (POST /api/v1/charge)
- * Body: { external_id, amount, webhook_url, payment_method }
- */
 app.post('/api/v1/charge', authenticateApiKey, async (req, res) => {
-  const { external_id, amount, webhook_url, payment_method } = req.body;
+  const { external_id, amount, webhook_url } = req.body;
 
   if (!external_id || !amount) {
     return res.status(400).json({ status: 'error', message: 'external_id dan amount wajib diisi' });
   }
 
   const baseAmt = parseFloat(amount);
-  if (isNaN(baseAmt) || baseAmt <= 0) {
+  if (!Number.isFinite(baseAmt) || baseAmt <= 0) {
     return res.status(400).json({ status: 'error', message: 'amount harus bernilai positif' });
   }
 
-  const method = payment_method === 'crypto' ? 'crypto' : 'qris';
+  envConfig = getEnvConfig();
+  const staticQris = req.merchant.static_qris || envConfig.static_qris;
+  if (!staticQris) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'String QRIS Statis perlu diset untuk merchant ini (atau di file .env) agar dapat men-generate dynamic QRIS'
+    });
+  }
 
   try {
-    if (method === 'crypto') {
-      if (process.env.ENABLE_CRYPTO === 'false') {
-        return res.status(400).json({ status: 'error', message: 'Metode pembayaran Crypto dinonaktifkan sementara oleh Administrator.' });
-      }
-
-      const apiKey = req.merchant.coinbase_api_key;
-      const apiSecret = req.merchant.coinbase_webhook_secret;
-
-      if (!apiKey || !apiSecret) {
-        return res.status(400).json({ status: 'error', message: 'API Key atau API Secret Coinbase belum dikonfigurasi untuk merchant ini.' });
-      }
-
-      console.log(`[Crypto Charge] Creating custom top-up address for merchant "${req.merchant.name}", IDR ${baseAmt}...`);
-
-      // 1. Get current exchange rate for USDT
-      const rate = await cryptoRates.getUsdtToIdrPrice();
-      // Calculate amount in USDT (precision to 6 decimals)
-      const amountCrypto = parseFloat((baseAmt / rate).toFixed(6));
-
-      // 2. Fetch the Coinbase USDT Account ID
-      const accountId = await coinbasePersonal.getAccountId(apiKey, apiSecret, 'USDT');
-
-      // 3. Generate a new receiving address
-      const { id: addressId, address } = await coinbasePersonal.createAddress(apiKey, apiSecret, accountId);
-
-      console.log(`[Crypto Charge] Address generated: ${address} for amount ${amountCrypto} USDT`);
-
-      // 4. Save transaction to SQLite
-      // Format of coinbase_charge_code: address:addressId:accountId:amountCrypto
-      const chargeCode = `${address}:${addressId}:${accountId}:${amountCrypto}`;
-      const result = await database.run(
-        'INSERT INTO transactions (merchant_id, external_id, amount, status, payment_method, coinbase_charge_code, webhook_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [req.merchant.id, external_id, baseAmt, 'pending', 'crypto', chargeCode, webhook_url || null]
-      );
-
-      return res.status(201).json({
-        status: 'pending',
-        transaction_id: result.id,
-        external_id: external_id,
-        amount: baseAmt,
-        payment_method: 'crypto',
-        hosted_url: address, // Used as target wallet address
-        amount_crypto: amountCrypto,
-        coinbase_charge_code: address, // fallback reference
-        created_at: new Date().toISOString()
-      });
-    }
-
-    // Otherwise, default to QRIS flow
-    // 1. Dapatkan daftar nominal dari semua transaksi yang sedang pending milik merchant ini
     const pendingTxs = await database.all(
       'SELECT amount FROM transactions WHERE merchant_id = ? AND status = "pending"',
       [req.merchant.id]
     );
-    const activeAmounts = new Set(pendingTxs.map(tx => tx.amount));
+    const activeAmounts = new Set(pendingTxs.map((tx) => tx.amount));
 
-    // 2. Cari kode unik (suffix) antara 1 sampai 199 yang belum digunakan untuk nominal dasar ini
     const maxSuffix = 199;
     let suffix = Math.floor(Math.random() * maxSuffix) + 1;
     let finalAmt = baseAmt + suffix;
 
     let attempts = 0;
     while (activeAmounts.has(finalAmt) && attempts < maxSuffix) {
-      suffix = (suffix % maxSuffix) + 1; // Geser ke kode unik berikutnya
+      suffix = (suffix % maxSuffix) + 1;
       finalAmt = baseAmt + suffix;
       attempts++;
     }
 
-    // Generate Dynamic QRIS string dengan nominal unik yang baru
-    const dynamicQrisStr = qrisUtil.generateDynamicQRIS(req.merchant.static_qris, finalAmt);
-    
-    // Generate QR Image data-url
-    const qrCodeImage = await qrisUtil.generateQRISImage(dynamicQrisStr);
+    const rawAcquirer = typeof req.body.acquirer === 'string' ? req.body.acquirer.trim().toLowerCase() : '';
+    const selectedAcquirer = ['bca', 'dana', 'multi'].includes(rawAcquirer)
+      ? rawAcquirer
+      : (req.merchant.qris_acquirer || 'bca');
 
-    // Save transaction to SQLite
+    const dynamicQrisStr = qrisUtil.generateDynamicQRIS(staticQris, finalAmt, selectedAcquirer);
+    const qrCodeImage = await qrisUtil.generateQRISImage(dynamicQrisStr);
+    const activeAcquirers = qrisUtil.inspectAcquirers(dynamicQrisStr).map((a) => a.name);
+
     const result = await database.run(
-      'INSERT INTO transactions (merchant_id, external_id, amount, status, qris_string, qris_image, webhook_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.merchant.id, external_id, finalAmt, 'pending', dynamicQrisStr, qrCodeImage, webhook_url || null]
+      'INSERT INTO transactions (merchant_id, external_id, amount, status, qris_string, qris_image, webhook_url, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.merchant.id, external_id, finalAmt, 'pending', dynamicQrisStr, qrCodeImage, webhook_url || null, 'qris']
     );
 
     res.status(201).json({
@@ -542,6 +753,9 @@ app.post('/api/v1/charge', authenticateApiKey, async (req, res) => {
       amount: finalAmt,
       base_amount: baseAmt,
       fee: suffix,
+      payment_method: 'qris',
+      qris_acquirer: selectedAcquirer,
+      active_acquirers: activeAcquirers,
       qris_string: dynamicQrisStr,
       qris_image: qrCodeImage,
       created_at: new Date().toISOString()
@@ -552,15 +766,12 @@ app.post('/api/v1/charge', authenticateApiKey, async (req, res) => {
   }
 });
 
-/**
- * Status endpoint (GET /api/v1/status/:external_id)
- */
 app.get('/api/v1/status/:external_id', authenticateApiKey, async (req, res) => {
   const { external_id } = req.params;
 
   try {
     const tx = await database.get(
-      'SELECT id, status, amount, payment_method, coinbase_charge_code, created_at, updated_at FROM transactions WHERE external_id = ? AND merchant_id = ?',
+      'SELECT id, status, amount, payment_method, created_at, updated_at FROM transactions WHERE external_id = ? AND merchant_id = ?',
       [external_id, req.merchant.id]
     );
 
@@ -568,47 +779,11 @@ app.get('/api/v1/status/:external_id', authenticateApiKey, async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Transaksi tidak ditemukan' });
     }
 
-    const parts = (tx.coinbase_charge_code || '').split(':');
-    const isPersonalCrypto = parts.length === 4;
-
-    if (tx.payment_method === 'crypto' && tx.status === 'pending' && isPersonalCrypto) {
-      const [address, addressId, accountId, amountCrypto] = parts;
-      const apiKey = req.merchant.coinbase_api_key;
-      const apiSecret = req.merchant.coinbase_webhook_secret;
-
-      if (apiKey && apiSecret) {
-        try {
-          console.log(`[Crypto Status] Polling Coinbase transactions for address: ${address}...`);
-          const transactions = await coinbasePersonal.checkTransactions(apiKey, apiSecret, accountId, addressId);
-          
-          // Look for completed transaction matching the target cryptocurrency and amount
-          const matchingTx = transactions.find(t => {
-            const matchesAmount = parseFloat(t.amount.amount) >= parseFloat(amountCrypto);
-            return t.status === 'completed' && matchesAmount;
-          });
-
-          if (matchingTx) {
-            console.log(`[Crypto Status] Matching transaction found! ID: ${matchingTx.id}. Marking as success.`);
-            await checkerService.markTransactionSuccess(tx.id, matchingTx.id);
-            tx.status = 'success'; // Update local variable for output response
-          }
-        } catch (err) {
-          console.error('[Crypto Status Check Error]', err.message);
-        }
-      }
-    }
-
-    const walletAddress = isPersonalCrypto ? parts[0] : (tx.coinbase_charge_code || null);
-    const amountCrypto = isPersonalCrypto ? parseFloat(parts[3]) : null;
-
     res.json({
       external_id: external_id,
       status: tx.status,
       amount: tx.amount,
-      payment_method: tx.payment_method || 'qris',
-      coinbase_charge_code: walletAddress,
-      hosted_url: walletAddress,
-      amount_crypto: amountCrypto,
+      payment_method: 'qris',
       created_at: tx.created_at,
       updated_at: tx.updated_at
     });
@@ -618,83 +793,10 @@ app.get('/api/v1/status/:external_id', authenticateApiKey, async (req, res) => {
   }
 });
 
-/**
- * Coinbase Commerce Webhook endpoint
- */
-app.post('/api/webhooks/coinbase', async (req, res) => {
-  const signature = req.headers['x-cc-webhook-signature'];
-  if (!signature) {
-    return res.status(400).json({ message: 'Missing X-CC-Webhook-Signature header' });
-  }
-
-  try {
-    const event = req.body.event;
-    if (!event || !event.data || !event.data.metadata) {
-      return res.status(400).json({ message: 'Invalid webhook payload structure' });
-    }
-
-    const { merchant_id, external_id } = event.data.metadata;
-    if (!merchant_id) {
-      return res.status(400).json({ message: 'Missing merchant_id in metadata' });
-    }
-
-    // Retrieve merchant to get the webhook shared secret
-    const merchant = await database.get('SELECT * FROM merchants WHERE id = ?', [merchant_id]);
-    if (!merchant) {
-      return res.status(404).json({ message: 'Merchant not found' });
-    }
-
-    if (!merchant.coinbase_webhook_secret) {
-      return res.status(400).json({ message: 'Merchant coinbase_webhook_secret not configured' });
-    }
-
-    // Verify webhook signature using rawBody buffer
-    const bodyToSign = req.rawBody || Buffer.from(JSON.stringify(req.body));
-    const computedSignature = crypto
-      .createHmac('sha256', merchant.coinbase_webhook_secret)
-      .update(bodyToSign)
-      .digest('hex');
-
-    if (computedSignature !== signature) {
-      console.warn(`[Coinbase Webhook] Signature mismatch for merchant #${merchant.id}. Received: ${signature}, Computed: ${computedSignature}`);
-      return res.status(401).json({ message: 'Signature verification failed' });
-    }
-
-    console.log(`[Coinbase Webhook] Signature verified successfully. Event: ${event.type}, Code: ${event.data.code}`);
-
-    // Process payment confirmation
-    if (event.type === 'charge:confirmed') {
-      const tx = await database.get(
-        'SELECT * FROM transactions WHERE coinbase_charge_code = ? AND merchant_id = ?',
-        [event.data.code, merchant.id]
-      );
-
-      if (tx) {
-        if (tx.status === 'pending') {
-          console.log(`[Coinbase Webhook] Payment confirmed for Tx #${tx.id} (External: ${tx.external_id}). Marking as success.`);
-          await checkerService.markTransactionSuccess(tx.id, event.data.id || 'coinbase_ref');
-        } else {
-          console.log(`[Coinbase Webhook] Transaction #${tx.id} is already in status: ${tx.status}. Skipping.`);
-        }
-      } else {
-        console.warn(`[Coinbase Webhook] No matching transaction found for charge code: ${event.data.code}`);
-      }
-    } else {
-      console.log(`[Coinbase Webhook] Received unhandled event type: ${event.type}`);
-    }
-
-    res.json({ status: 'ok' });
-  } catch (err) {
-    console.error('[Coinbase Webhook Error]', err.message);
-    res.status(500).json({ message: 'Internal server error: ' + err.message });
-  }
-});
-
-// Webhook logger in-memory database for testing
+// Webhook mock testing logger
 const webhookLogs = [];
 
 app.post('/api/test-webhook', (req, res) => {
-  console.log('[Mock Webhook] Received payload:', req.body);
   webhookLogs.unshift({
     timestamp: new Date().toISOString(),
     headers: req.headers,
@@ -708,23 +810,23 @@ app.get('/api/test-webhook-logs', (req, res) => {
   res.json(webhookLogs);
 });
 
-
 // Start Server & Database Initialization
-(async () => {
-  try {
-    console.log('Initializing database...');
-    await database.initDb();
-    console.log('Database initialized successfully.');
+if (require.main === module) {
+  (async () => {
+    try {
+      console.log('Initializing database...');
+      await database.initDb(envConfig);
+      console.log('Database initialized successfully.');
 
-    // Start Express listener
-    app.listen(PORT, () => {
-      console.log(`BCA Payment Gateway server is running on port ${PORT}`);
-      
-      // Start background polling transaction check
-      checkerService.startChecker(10000); // Poll every 10 seconds
-    });
-  } catch (err) {
-    console.error('Failed to initialize server:', err);
-    process.exit(1);
-  }
-})();
+      app.listen(PORT, () => {
+        console.log(`BCA Payment Gateway server is running on port ${PORT}`);
+        checkerService.startChecker(10000);
+      });
+    } catch (err) {
+      console.error('Failed to initialize server:', err);
+      process.exit(1);
+    }
+  })();
+}
+
+module.exports = { app, envConfig };

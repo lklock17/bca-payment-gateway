@@ -17,12 +17,14 @@ conn.on('ready', () => {
     const filesToUpload = [
       { local: 'database.js', remote: '/opt/bcagateaway/database.js' },
       { local: 'server.js', remote: '/opt/bcagateaway/server.js' },
+      { local: 'public/index.html', remote: '/opt/bcagateaway/public/index.html' },
       { local: 'public/dashboard.html', remote: '/opt/bcagateaway/public/dashboard.html' },
       { local: 'public/tester.html', remote: '/opt/bcagateaway/public/tester.html' },
       { local: 'public/docs.html', remote: '/opt/bcagateaway/public/docs.html' },
-      { local: 'utils/cryptoRates.js', remote: '/opt/bcagateaway/utils/cryptoRates.js' },
-      { local: 'utils/qris.js', remote: '/opt/bcagateaway/utils/qris.js' },
-      { local: 'utils/coinbasePersonal.js', remote: '/opt/bcagateaway/utils/coinbasePersonal.js' }
+      { local: 'public/css/style.css', remote: '/opt/bcagateaway/public/css/style.css' },
+      { local: 'public/js/ui-core.js', remote: '/opt/bcagateaway/public/js/ui-core.js' },
+      { local: 'services/bcaChecker.js', remote: '/opt/bcagateaway/services/bcaChecker.js' },
+      { local: 'utils/qris.js', remote: '/opt/bcagateaway/utils/qris.js' }
     ];
 
     let uploadIndex = 0;
