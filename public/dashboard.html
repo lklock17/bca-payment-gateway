@@ -2,86 +2,93 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#060a14">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2'%3E%3Cpath d='M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z'/%3E%3Cpath d='M9 12l2 2 4-4'/%3E%3C/svg%3E">
   <title>Dashboard - BCA Payment Gateway</title>
   <link rel="stylesheet" href="/css/style.css">
+  <script>
+    if (localStorage.getItem('bca_sidebar_collapsed') === 'true' && window.innerWidth >= 768) {
+      document.documentElement.classList.add('sidebar-collapsed-preload');
+    }
+  </script>
   <style>
-    /* Position toast container higher to avoid overlay with logs bubble */
-    .toast-container {
-      bottom: 90px !important;
+    /* Desktop toast above log bubble */
+    @media (min-width: 768px) {
+      .toast-container {
+        bottom: 78px !important;
+      }
     }
 
     /* Log Widget Container */
     .log-widget-container {
       position: fixed;
-      bottom: 24px;
-      right: 24px;
+      bottom: 18px;
+      right: 18px;
       z-index: 1500;
       font-family: var(--font-body);
     }
 
-    /* Floating Log Bubble Button */
     .log-bubble-btn {
-      width: 50px;
-      height: 50px;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
-      background: var(--bg-secondary);
-      border: 1px solid var(--card-border);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-strong);
+      box-shadow: var(--shadow-lg);
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       color: var(--text-secondary);
-      transition: var(--transition);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      transition: var(--transition-fast);
       position: relative;
     }
 
     .log-bubble-btn:hover {
-      color: #fff;
-      transform: scale(1.05);
-      border-color: rgba(255, 255, 255, 0.2);
-      box-shadow: 0 0 15px var(--accent-glow);
+      color: #ffffff;
+      border-color: var(--bca-cyan);
+      box-shadow: var(--shadow-glow-blue);
     }
 
     .log-bubble-btn.active {
-      background: var(--accent-color);
-      color: #fff;
-      border-color: rgba(255, 255, 255, 0.3);
-      box-shadow: 0 0 20px var(--accent-glow);
+      background: var(--bca-blue);
+      color: #ffffff;
+      border-color: var(--bca-cyan);
+      box-shadow: var(--shadow-glow-blue);
     }
 
     .log-bubble-btn .notification-badge {
       position: absolute;
-      top: -2px;
-      right: -2px;
-      width: 12px;
-      height: 12px;
+      top: -1px;
+      right: -1px;
+      width: 10px;
+      height: 10px;
       background-color: var(--danger);
       border-radius: 50%;
-      border: 2px solid var(--bg-primary);
+      border: 2px solid var(--bg-canvas);
       display: none;
     }
 
     /* Logs Panel */
     .log-panel {
       position: fixed;
-      bottom: 90px;
-      right: 24px;
-      width: 420px;
-      height: 520px;
-      max-width: calc(100vw - 48px);
-      max-height: calc(100vh - 130px);
+      bottom: 72px;
+      right: 18px;
+      width: 400px;
+      height: 460px;
+      max-width: calc(100vw - 36px);
+      max-height: calc(100vh - 110px);
       display: flex;
       flex-direction: column;
       z-index: 1499;
-      transform: translateY(20px) scale(0.95);
+      transform: translateY(16px) scale(0.96);
       opacity: 0;
       pointer-events: none;
-      transition: var(--transition);
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.16s ease;
       overflow: hidden;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-strong);
     }
 
     .log-panel.active {
@@ -90,92 +97,99 @@
       pointer-events: all;
     }
 
-    /* Logs Header */
+    .log-sheet-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.72);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      z-index: 1490;
+    }
+
+    .log-sheet-backdrop.active {
+      display: block;
+    }
+
     .log-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--card-border);
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-subtle);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: rgba(15, 23, 42, 0.6);
+      gap: 8px;
+      background: #0c1322;
     }
 
     .log-header-title {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 0.95rem;
+      gap: 7px;
+      font-size: 13px;
       font-weight: 600;
-      color: #fff;
+      color: #ffffff;
     }
 
     .log-live-indicator {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      font-size: 0.75rem;
+      gap: 5px;
+      font-size: 10.5px;
       color: var(--success);
-      font-weight: 500;
-      background: rgba(16, 185, 129, 0.1);
-      padding: 2px 8px;
-      border-radius: 12px;
-      border: 1px solid rgba(16, 185, 129, 0.2);
+      font-weight: 600;
+      background: var(--success-bg);
+      padding: 2px 7px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--success-border);
     }
 
     .log-live-dot {
-      width: 6px;
-      height: 6px;
+      width: 5px;
+      height: 5px;
       background-color: var(--success);
       border-radius: 50%;
       animation: pulse 1.5s infinite;
     }
 
-    @keyframes pulse {
-      0% { transform: scale(0.8); opacity: 0.5; }
-      50% { transform: scale(1.2); opacity: 1; }
-      100% { transform: scale(0.8); opacity: 0.5; }
-    }
-
     .log-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 5px;
     }
 
     .log-action-btn {
-      background: none;
-      border: none;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
       color: var(--text-secondary);
       cursor: pointer;
-      font-size: 0.85rem;
-      padding: 4px;
-      border-radius: 4px;
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: var(--transition);
+      transition: var(--transition-fast);
     }
 
     .log-action-btn:hover {
-      color: #fff;
-      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.1);
     }
 
-    /* Log Search Utility */
     .log-search-container {
-      padding: 8px 16px;
-      border-bottom: 1px solid var(--card-border);
-      background: rgba(15, 23, 42, 0.4);
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: #090e1a;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
     }
 
     .log-search-input {
       background: transparent;
       border: none;
-      color: var(--text-primary);
-      font-size: 0.85rem;
+      color: var(--text-main);
+      font-size: 12.5px;
       width: 100%;
       outline: none;
     }
@@ -184,42 +198,26 @@
       color: var(--text-muted);
     }
 
-    /* Logs Body (Scrollable terminal) */
     .log-body {
       flex: 1;
       overflow-y: auto;
-      padding: 16px;
-      background: rgba(3, 7, 18, 0.95);
+      -webkit-overflow-scrolling: touch;
+      padding: 10px 12px;
+      background: #050912;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 0.8rem;
-      line-height: 1.4;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.45;
     }
 
-    /* Custom Scrollbar for Logs */
-    .log-body::-webkit-scrollbar {
-      width: 6px;
-    }
-    .log-body::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    .log-body::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 3px;
-    }
-    .log-body::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    /* Individual Log Entries */
     .log-entry {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       word-break: break-word;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.02);
-      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      padding-bottom: 5px;
     }
 
     .log-entry-time {
@@ -230,47 +228,41 @@
 
     .log-entry-badge {
       flex-shrink: 0;
-      font-weight: bold;
+      font-weight: 700;
       text-transform: uppercase;
-      font-size: 0.75rem;
+      font-size: 10px;
       border-radius: 3px;
-      padding: 0 4px;
+      padding: 1px 4px;
+      height: fit-content;
       user-select: none;
     }
 
-    .log-entry-info {
-      color: #e2e8f0;
-    }
+    .log-entry-info { color: #e2e8f0; }
     .log-entry-info .log-entry-badge {
-      background: rgba(96, 165, 250, 0.15);
-      color: #60a5fa;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--bca-cyan);
     }
 
-    .log-entry-warn {
-      color: #fde047;
-    }
+    .log-entry-warn { color: #fde047; }
     .log-entry-warn .log-entry-badge {
-      background: rgba(245, 158, 11, 0.15);
-      color: #f59e0b;
+      background: var(--warning-bg);
+      color: var(--warning);
     }
 
-    .log-entry-error {
-      color: #fca5a5;
-    }
+    .log-entry-error { color: #fca5a5; }
     .log-entry-error .log-entry-badge {
-      background: rgba(239, 68, 68, 0.15);
-      color: #ef4444;
+      background: var(--danger-bg);
+      color: #f87171;
     }
 
-    /* Logs Footer */
     .log-footer {
-      padding: 10px 16px;
-      border-top: 1px solid var(--card-border);
-      background: rgba(15, 23, 42, 0.6);
+      padding: 8px 12px;
+      border-top: 1px solid var(--border-subtle);
+      background: #0c1322;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 0.75rem;
+      font-size: 11.5px;
       color: var(--text-secondary);
     }
 
@@ -281,56 +273,141 @@
       cursor: pointer;
       user-select: none;
     }
+
+    .tx-modal-sticky-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 767px) {
+      .log-panel .bottom-sheet-handle {
+        display: block;
+        margin-top: 8px;
+        margin-bottom: 4px;
+      }
+      .log-action-btn {
+        width: 34px;
+        height: 34px;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="dashboard-wrapper">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="sidebar-logo">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/>
+
+  <!-- Mobile Sticky Topbar (< 768px) -->
+  <header class="mobile-topbar">
+    <div class="mobile-topbar-left">
+      <button type="button" class="mobile-menu-trigger" id="mobileMenuBtn" aria-label="Buka navigasi utama" aria-controls="mainSidebar" aria-expanded="false">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
         </svg>
-        <span>BCA Gateway</span>
+      </button>
+      <div class="brand-icon-badge" style="width: 28px; height: 28px; border-radius: 6px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
       </div>
-      <nav>
+      <span id="mobileTopBarTitle" style="font-family: var(--font-display); font-weight: 600; font-size: 14px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Overview</span>
+    </div>
+    <div class="mobile-topbar-right">
+      <div class="mobile-status-chip" title="Gateway Online">
+        <span class="dot"></span>
+        <span>LIVE</span>
+      </div>
+      <div class="avatar" id="mobileUserAvatar" style="width: 28px; height: 28px; font-size: 12px;">A</div>
+    </div>
+  </header>
+
+  <!-- Mobile Drawer Backdrop -->
+  <div class="mobile-drawer-backdrop" id="drawerBackdrop"></div>
+
+  <div class="dashboard-wrapper">
+    <!-- Sidebar / Mobile Off-Canvas Drawer -->
+    <aside class="sidebar" id="mainSidebar" aria-label="Navigasi Utama">
+      <div class="sidebar-header-row">
+        <a href="#" class="sidebar-logo" onclick="switchTab('overview'); return false;" title="BCA Payment Gateway">
+          <div class="brand-icon-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/>
+              <path d="M9 12l2 2 4-4"/>
+            </svg>
+          </div>
+          <span class="sidebar-logo-text">BCA Gateway</span>
+        </a>
+        <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="Minimize / Expand Sidebar" aria-label="Toggle Sidebar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <button type="button" class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Tutup menu navigasi">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <nav style="flex: 1; overflow-y: auto;">
+        <div class="sidebar-section-label">Menu Utama</div>
         <ul class="sidebar-menu">
           <li class="sidebar-item active" data-tab="overview">
-            <a href="#">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-              Overview
+            <a href="#overview" data-tooltip="Overview">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+              <span>Overview</span>
             </a>
           </li>
           <li class="sidebar-item" data-tab="merchants">
-            <a href="#">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-              Akun BCA Merchant
+            <a href="#merchants" data-tooltip="Akun BCA Merchant">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+              <span>Akun BCA Merchant</span>
             </a>
           </li>
           <li class="sidebar-item" data-tab="transactions">
-            <a href="#">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-              Transaksi QRIS
+            <a href="#transactions" data-tooltip="Transaksi BCA QRIS">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              <span>Transaksi BCA QRIS</span>
             </a>
           </li>
           <li class="sidebar-item admin-only" data-tab="users">
-            <a href="#">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-              Manajemen User
+            <a href="#users" data-tooltip="Manajemen User">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              <span>Manajemen User</span>
+            </a>
+          </li>
+        </ul>
+
+        <div class="sidebar-section-label" style="margin-top: 14px;">Developer &amp; API</div>
+        <ul class="sidebar-menu">
+          <li class="sidebar-item">
+            <a href="/tester.html" data-tooltip="API & Webhook Tester">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+              <span>API &amp; Webhook Tester</span>
             </a>
           </li>
           <li class="sidebar-item">
-            <a href="/docs.html">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-              Dokumentasi API
+            <a href="/docs.html" data-tooltip="Dokumentasi API">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+              <span>Dokumentasi API</span>
             </a>
           </li>
         </ul>
       </nav>
+
       <div class="sidebar-footer">
-        <button id="logoutBtn" class="btn btn-secondary btn-block">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-          Keluar
+        <div class="sidebar-user-card">
+          <div class="avatar" id="sidebarUserAvatar">A</div>
+          <div class="sidebar-user-info" style="min-width: 0; flex: 1;">
+            <div id="sidebarProfileEmail" style="font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">admin@gateway.com</div>
+            <div id="sidebarProfileRole" style="font-size: 11px; color: var(--bca-cyan);">Administrator</div>
+          </div>
+        </div>
+        <button id="logoutBtn" class="btn btn-secondary btn-block" data-tooltip="Keluar / Logout">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          <span class="logout-text">Keluar / Logout</span>
         </button>
       </div>
     </aside>
@@ -340,12 +417,13 @@
       <header class="dashboard-header">
         <div class="dashboard-title">
           <h2 id="sectionTitle">Overview</h2>
+          <p class="dashboard-subtitle" id="sectionSubtitle">Ringkasan metrik gateway &amp; aktivitas transaksi BCA QRIS real-time</p>
         </div>
         <div class="user-profile">
           <div class="avatar" id="userAvatar">A</div>
-          <div>
-            <div style="font-weight: 600;" id="profileEmail">admin@gateway.com</div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary);" id="profileRole">Administrator</div>
+          <div style="padding-right: 4px;">
+            <div style="font-weight: 600; font-size: 12.5px; color: #fff;" id="profileEmail">admin@gateway.com</div>
+            <div style="font-size: 11px; color: var(--bca-cyan);" id="profileRole">Administrator</div>
           </div>
         </div>
       </header>
@@ -356,48 +434,71 @@
           <div class="glass-panel stat-card">
             <div class="stat-header">
               <span>Volume Transaksi Sukses</span>
-              <div class="stat-icon" style="color: var(--success);">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              <div class="stat-icon" style="color: var(--success); background: var(--success-bg);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
               </div>
             </div>
             <div class="stat-value" id="statVolume">Rp 0</div>
-            <div class="stat-footer">Semua merchant aktif</div>
+            <div class="stat-footer">Total akumulasi merchant aktif</div>
           </div>
+
           <div class="glass-panel stat-card">
             <div class="stat-header">
               <span>Jumlah Transaksi</span>
-              <div class="stat-icon" style="color: var(--accent-color);">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <div class="stat-icon" style="color: var(--bca-cyan); background: rgba(56, 189, 248, 0.12);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
               </div>
             </div>
             <div class="stat-value" id="statTotalTx">0</div>
             <div class="stat-footer" id="statPendingTx">0 pending</div>
           </div>
+
           <div class="glass-panel stat-card">
             <div class="stat-header">
               <span>Tingkat Keberhasilan</span>
-              <div class="stat-icon" style="color: var(--success);">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+              <div class="stat-icon" style="color: var(--success); background: var(--success-bg);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
               </div>
             </div>
             <div class="stat-value" id="statSuccessRate">0%</div>
+            <div class="stat-progress-track">
+              <div class="stat-progress-fill" id="statSuccessProgress" style="width: 0%;"></div>
+            </div>
             <div class="stat-footer" id="statSuccessCount">0 sukses</div>
           </div>
+
           <div class="glass-panel stat-card">
             <div class="stat-header">
               <span>BCA Merchant Terkoneksi</span>
-              <div class="stat-icon" style="color: #60a5fa;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+              <div class="stat-icon" style="color: #60a5fa; background: rgba(37, 99, 235, 0.16);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
               </div>
             </div>
             <div class="stat-value" id="statActiveMerchants">0</div>
-            <div class="stat-footer">Akun terdaftar</div>
+            <div class="stat-footer">Gerai &amp; akun aktif</div>
           </div>
         </div>
 
-        <div class="glass-panel" style="padding: 24px;">
-          <h3 style="margin-bottom: 20px; font-size: 1.2rem;">Riwayat Transaksi Terbaru</h3>
-          <div class="table-container">
+        <div class="glass-panel" id="envStatusStrip" style="padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; min-width: 0;">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; flex-wrap: wrap; min-width: 0; flex: 1;">
+            <span class="badge badge-info" id="envStatusBadge" style="flex-shrink: 0;">Cek Konfigurasi .env...</span>
+            <span id="envStatusDesc" style="color: var(--text-secondary); word-break: break-word; overflow-wrap: anywhere; min-width: 0;">Memeriksa konfigurasi BCA QRIS pada environment server...</span>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <a href="/tester.html" class="btn btn-secondary btn-sm">API Tester</a>
+            <a href="/docs.html" class="btn btn-secondary btn-sm">Dokumentasi API</a>
+          </div>
+        </div>
+
+        <div class="glass-panel section-panel">
+          <div class="row-header" style="margin-bottom: 12px;">
+            <h3>Riwayat Transaksi Terbaru</h3>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="switchTab('transactions')">Lihat Semua</button>
+          </div>
+          <div id="recentTransactionsError"></div>
+
+          <!-- Desktop Table -->
+          <div class="table-responsive-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
@@ -411,68 +512,86 @@
                   <th>Aksi</th>
                 </tr>
               </thead>
-              <tbody id="recentTransactionsTableBody">
-                <!-- Dynamic Content -->
-              </tbody>
+              <tbody id="recentTransactionsTableBody"></tbody>
             </table>
           </div>
+
+          <!-- Mobile Card List -->
+          <div class="mobile-card-list" id="recentTransactionsMobileCards"></div>
         </div>
       </section>
 
       <!-- TAB: BCA Merchant Accounts -->
       <section id="merchantsTab" class="tab-section">
         <div class="row-header">
-          <h3>Konfigurasi Akun Merchant</h3>
-          <div style="display: flex; gap: 12px;">
-            <button class="btn btn-secondary" onclick="loadMerchants()" style="padding: 10px 18px; font-size: 0.9rem;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <div>
+            <h3>Konfigurasi Akun BCA Merchant</h3>
+            <p style="font-size: 12.5px; color: var(--text-secondary);">Kelola kredensial KlikBCA Scraper &amp; QRIS Statis (mendukung fallback <code>.env</code>)</p>
+          </div>
+          <div class="row-header-actions">
+            <button type="button" class="btn btn-secondary" onclick="loadMerchants()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
               Refresh Status
             </button>
-            <button class="btn btn-primary" onclick="openAddMerchantModal()" style="padding: 10px 18px; font-size: 0.9rem;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <button type="button" class="btn btn-primary admin-only" onclick="openAddMerchantModal()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               Tambah Merchant
             </button>
           </div>
         </div>
 
-        <div class="glass-panel" style="padding: 24px;">
-          <div class="table-container">
+        <div class="glass-panel section-panel">
+          <div id="merchantsError"></div>
+          <!-- Desktop Table -->
+          <div class="table-responsive-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
                   <th>Nama Merchant</th>
                   <th>BCA User (Email Kasir)</th>
-                  <th>Kredensial</th>
-                  <th>API Key (Untuk Integrasi Toko)</th>
-                  <th>Status</th>
+                  <th>Kredensial QRIS</th>
+                  <th>API Key (Integrasi Toko)</th>
+                  <th>Status Scraper</th>
                   <th>Aksi</th>
                 </tr>
               </thead>
-              <tbody id="merchantsTableBody">
-                <!-- Dynamic Content -->
-              </tbody>
+              <tbody id="merchantsTableBody"></tbody>
             </table>
           </div>
+
+          <!-- Mobile Card List -->
+          <div class="mobile-card-list" id="merchantsMobileCards"></div>
         </div>
       </section>
 
       <!-- TAB: Transactions -->
       <section id="transactionsTab" class="tab-section">
-        <div class="glass-panel" style="padding: 24px; margin-bottom: 24px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center;">
-          <div style="flex: 1; min-width: 250px;">
-            <input type="text" id="txSearchInput" class="form-control" placeholder="Cari berdasarkan ID Eksternal atau ID Transaksi..." oninput="filterTransactions()">
+        <div class="glass-panel filter-toolbar">
+          <div class="filter-toolbar-search">
+            <div class="input-icon-wrap">
+              <span class="input-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </span>
+              <input type="text" id="txSearchInput" class="form-control" placeholder="Cari ID Eksternal, ID Transaksi, atau Merchant..." oninput="filterTransactions()">
+            </div>
           </div>
-          <div>
-            <select id="txFilterStatus" class="form-control" style="width: 150px;" onchange="filterTransactions()">
+          <div class="filter-toolbar-select">
+            <select id="txFilterStatus" class="form-control" onchange="filterTransactions()" aria-label="Filter Status Transaksi">
               <option value="all">Semua Status</option>
               <option value="pending">Pending</option>
               <option value="success">Sukses</option>
             </select>
           </div>
+          <button type="button" class="btn btn-secondary" onclick="loadTransactions()" title="Muat ulang data transaksi">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            <span class="hide-on-xs">Refresh</span>
+          </button>
         </div>
 
-        <div class="glass-panel" style="padding: 24px;">
-          <div class="table-container">
+        <div class="glass-panel section-panel">
+          <div id="transactionsError"></div>
+          <!-- Desktop Table -->
+          <div class="table-responsive-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
@@ -486,89 +605,146 @@
                   <th>Aksi</th>
                 </tr>
               </thead>
-              <tbody id="transactionsTableBody">
-                <!-- Dynamic Content -->
-              </tbody>
+              <tbody id="transactionsTableBody"></tbody>
             </table>
           </div>
+
+          <!-- Mobile Card List -->
+          <div class="mobile-card-list" id="transactionsMobileCards"></div>
         </div>
       </section>
 
       <!-- TAB: User Management -->
       <section id="usersTab" class="tab-section">
         <div class="row-header">
-          <h3>Manajemen User & Administrator</h3>
-          <button class="btn btn-primary" onclick="openAddUserModal()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Tambah User
-          </button>
+          <div>
+            <h3>Manajemen User &amp; Administrator</h3>
+            <p style="font-size: 12.5px; color: var(--text-secondary);">Atur hak akses operator kasir dan administrator sistem</p>
+          </div>
+          <div class="row-header-actions">
+            <button type="button" class="btn btn-primary" id="addUserBtn" onclick="openAddUserModal()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Tambah User
+            </button>
+          </div>
         </div>
 
-        <div class="glass-panel" style="padding: 24px;">
-          <div class="table-container">
+        <div id="userEnvNotice" style="display: none; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-glass); background: rgba(56, 189, 248, 0.08); margin-bottom: 12px; font-size: 12px; color: var(--text-secondary);"></div>
+
+        <div class="glass-panel section-panel">
+          <div id="usersError"></div>
+          <!-- Desktop Table -->
+          <div class="table-responsive-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
                   <th>ID</th>
                   <th>Alamat Email</th>
                   <th>Role</th>
+                  <th>Status</th>
                   <th>Tanggal Dibuat</th>
                   <th>Aksi</th>
                 </tr>
               </thead>
-              <tbody id="usersTableBody">
-                <!-- Dynamic Content -->
-              </tbody>
+              <tbody id="usersTableBody"></tbody>
             </table>
           </div>
+
+          <!-- Mobile Card List -->
+          <div class="mobile-card-list" id="usersMobileCards"></div>
         </div>
       </section>
     </main>
   </div>
 
-  <!-- MODAL: Add/Edit Merchant -->
-  <div class="modal-overlay" id="merchantModal">
-    <div class="glass-panel modal-content" style="max-height: 90vh; overflow-y: auto;">
-      <button class="modal-close" onclick="closeMerchantModal()">×</button>
-      <h3 style="margin-bottom: 24px;" id="merchantModalTitle">Tambah Akun BCA/Crypto Merchant</h3>
+  <!-- Floating Bottom Navigation Bar (< 768px) -->
+  <nav class="mobile-bottom-nav" aria-label="Navigasi Cepat Mobile">
+    <ul class="mobile-bottom-nav-list">
+      <li class="mobile-bottom-nav-item">
+        <button type="button" class="mobile-bottom-nav-link active" data-mobile-tab="overview" onclick="switchTab('overview')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span>Overview</span>
+        </button>
+      </li>
+      <li class="mobile-bottom-nav-item admin-only">
+        <button type="button" class="mobile-bottom-nav-link" data-mobile-tab="merchants" onclick="switchTab('merchants')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span>Merchant</span>
+        </button>
+      </li>
+      <li class="mobile-bottom-nav-item">
+        <button type="button" class="mobile-bottom-nav-link" data-mobile-tab="transactions" onclick="switchTab('transactions')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          <span>Transaksi</span>
+        </button>
+      </li>
+      <li class="mobile-bottom-nav-item admin-only">
+        <button type="button" class="mobile-bottom-nav-link" id="mobileNavLogsBtn" onclick="toggleLogPanel()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+          <span>Logs</span>
+          <span class="mobile-nav-badge" id="mobileLogNotificationBadge"></span>
+        </button>
+      </li>
+    </ul>
+  </nav>
+
+  <!-- MODAL: Add/Edit Merchant (Pure BCA QRIS + .env optional fallback) -->
+  <div class="modal-overlay" id="merchantModal" role="dialog" aria-modal="true" aria-labelledby="merchantModalTitle">
+    <div class="glass-panel modal-content">
+      <div class="bottom-sheet-handle"></div>
+      <button type="button" class="modal-close" onclick="closeMerchantModal()" aria-label="Tutup">&times;</button>
+      <h3 style="margin-bottom: 14px; padding-right: 30px;" id="merchantModalTitle">Tambah Akun BCA Merchant</h3>
       
       <form id="merchantForm">
         <input type="hidden" id="merchantId">
         <div class="form-group">
           <label class="form-label" for="merchantName">Nama Merchant / Toko</label>
-          <input type="text" id="merchantName" class="form-control" placeholder="Toko A" required>
+          <input type="text" id="merchantName" class="form-control" placeholder="Contoh: Toko Cabang Utama" required>
         </div>
         
-        <div style="border-top: 1px solid var(--card-border); margin: 20px 0; padding-top: 10px;">
-          <h4 style="margin-bottom: 12px; color: var(--accent-color);">1. Kredensial BCA QRIS (Opsional jika Crypto Aktif)</h4>
-          <div class="form-group">
-            <label class="form-label" for="bcaUser">BCA User (Email Kasir klikbca)</label>
-            <input type="email" id="bcaUser" class="form-control" placeholder="kimmo.laau@gmail.com">
+        <div style="border-top: 1px solid var(--border-subtle); margin: 14px 0 0; padding-top: 12px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+            <h4 style="color: var(--bca-cyan);">Kredensial BCA QRIS</h4>
+            <span class="badge badge-info">Opsional jika diset di .env</span>
+          </div>
+          <div id="merchantEnvNotice" style="margin-bottom: 10px; padding: 8px 10px; border-radius: var(--radius-md); font-size: 12px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); color: var(--text-secondary);">
+            Memeriksa status konfigurasi <code>.env</code> server...
           </div>
           <div class="form-group">
-            <label class="form-label" for="bcaPass">BCA Password</label>
-            <input type="password" id="bcaPass" class="form-control" placeholder="GanTeng188">
+            <label class="form-label" for="bcaUser">BCA User (Email Kasir KlikBCA) <span style="font-weight: 400; color: var(--text-muted);">(Opsional)</span></label>
+            <input type="email" id="bcaUser" class="form-control" placeholder="kasir@toko.com (kosongkan jika pakai .env)">
           </div>
           <div class="form-group">
-            <label class="form-label" for="staticQris">Payload String QRIS Statis</label>
-            <textarea id="staticQris" class="form-control" rows="3" placeholder="00020101021138530015ID.CO.QRIS..." style="resize: none; font-family: monospace; font-size: 0.8rem;"></textarea>
-            <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 4px;">Tempel kode string text QRIS statis dari KlikBCA Merchant Anda di sini.</small>
+            <label class="form-label" for="bcaPass">BCA Password <span style="font-weight: 400; color: var(--text-muted);">(Opsional)</span></label>
+            <div class="input-icon-wrap">
+              <input type="password" id="bcaPass" class="form-control" placeholder="•••••••• (kosongkan jika pakai .env)" style="padding-left: 11px; padding-right: 36px;">
+              <button type="button" class="input-action-btn" id="toggleBcaPassBtn" title="Tampilkan password" aria-label="Tampilkan password">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
           </div>
-        </div>
+          <div class="form-group" style="margin-bottom: 6px;">
+            <label class="form-label" for="staticQris">Payload String QRIS Statis <span style="font-weight: 400; color: var(--text-muted);">(Opsional)</span></label>
+            <textarea id="staticQris" class="form-control font-mono" rows="3" placeholder="00020101021138530015ID.CO.QRIS... (opsional, bisa diisi nanti)" style="resize: vertical;"></textarea>
+            <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 4px;">
+              Opsional saat pendaftaran merchant (dapat diisi belakangan via Edit; diperlukan saat generate Dynamic QRIS). Kosongkan field kredensial di atas apabila Anda telah mengaturnya di file <code>.env</code>.
+            </small>
+          </div>
 
-        <div style="border-top: 1px solid var(--card-border); margin: 20px 0; padding-top: 10px;">
-          <h4 style="margin-bottom: 12px; color: #60a5fa;">2. Kredensial Coinbase Crypto (Opsional jika QRIS Aktif)</h4>
-          <div class="form-group">
-            <label class="form-label" for="coinbaseApiKey">Coinbase Commerce API Key</label>
-            <input type="password" id="coinbaseApiKey" class="form-control" placeholder="Masukkan API Key dari Coinbase Commerce">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="coinbaseWebhookSecret">Coinbase Webhook Shared Secret</label>
-            <input type="password" id="coinbaseWebhookSecret" class="form-control" placeholder="Masukkan Webhook Shared Secret">
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label" for="qrisAcquirer">Routing Bank / Acquirer QRIS</label>
+            <select id="qrisAcquirer" class="form-control">
+              <option value="bca">Hanya BCA (ID.CO.BCA.WWW) — Wajib agar auto-konfirmasi KlikBCA aktif</option>
+              <option value="dana">Hanya DANA (ID.DANA.WWW) — Masuk ke akun DANA Bisnis</option>
+              <option value="multi">Semua Acquirer Asli (BCA + DANA / Multi-Bank)</option>
+            </select>
+            <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 3px;">
+              Pilih <strong>Hanya BCA</strong> jika QRIS Anda memuat DANA &amp; BCA sekaligus, agar seluruh pembayaran pembeli dipaksa diproses oleh BCA sehingga mutasi otomatis masuk ke KlikBCA.
+            </small>
           </div>
         </div>
         
-        <div style="display: flex; gap: 12px; margin-top: 24px;">
+        <div class="tx-modal-sticky-actions">
           <button type="button" class="btn btn-secondary btn-block" onclick="closeMerchantModal()">Batal</button>
           <button type="submit" class="btn btn-primary btn-block">Simpan</button>
         </div>
@@ -577,31 +753,39 @@
   </div>
 
   <!-- MODAL: Add/Edit User -->
-  <div class="modal-overlay" id="userModal">
+  <div class="modal-overlay" id="userModal" role="dialog" aria-modal="true" aria-labelledby="userModalTitle">
     <div class="glass-panel modal-content">
-      <button class="modal-close" onclick="closeUserModal()">×</button>
-      <h3 style="margin-bottom: 24px;" id="userModalTitle">Tambah User Baru</h3>
+      <div class="bottom-sheet-handle"></div>
+      <button type="button" class="modal-close" onclick="closeUserModal()" aria-label="Tutup">&times;</button>
+      <h3 style="margin-bottom: 14px; padding-right: 30px;" id="userModalTitle">Tambah User Baru</h3>
       
       <form id="userForm">
         <input type="hidden" id="userId">
         <div class="form-group">
           <label class="form-label" for="userEmail">Alamat Email</label>
-          <input type="email" id="userEmail" class="form-control" placeholder="user@gmail.com" required autocomplete="username">
+          <input type="email" id="userEmail" class="form-control" placeholder="kasir@perusahaan.com" required autocomplete="username">
         </div>
         <div class="form-group">
           <label class="form-label" for="userPassword" id="userPasswordLabel">Password</label>
           <input type="password" id="userPassword" class="form-control" placeholder="••••••••" autocomplete="new-password">
-          <small style="color: var(--text-muted); font-size: 0.75rem; display: none; margin-top: 4px;" id="userPasswordHelp">Kosongkan jika tidak ingin mengubah password.</small>
+          <small style="color: var(--text-muted); font-size: 11px; display: none; margin-top: 4px;" id="userPasswordHelp">Kosongkan jika tidak ingin mengubah password.</small>
         </div>
         <div class="form-group">
           <label class="form-label" for="userRole">Role Akses</label>
           <select id="userRole" class="form-control">
-            <option value="user">User biasa (Hanya melihat transaksi)</option>
+            <option value="user">User Kasir (Hanya melihat transaksi)</option>
             <option value="admin">Administrator (Akses Penuh)</option>
           </select>
         </div>
+        <div class="form-group" id="userActiveGroup" style="display: none;">
+          <label class="form-label" for="userActive">Status Akun</label>
+          <select id="userActive" class="form-control">
+            <option value="1">Aktif</option>
+            <option value="0">Nonaktif (Blokir Login)</option>
+          </select>
+        </div>
         
-        <div style="display: flex; gap: 12px; margin-top: 24px;">
+        <div class="tx-modal-sticky-actions">
           <button type="button" class="btn btn-secondary btn-block" onclick="closeUserModal()">Batal</button>
           <button type="submit" class="btn btn-primary btn-block" id="userSubmitBtn">Tambah</button>
         </div>
@@ -610,123 +794,283 @@
   </div>
 
   <!-- MODAL: View QRIS -->
-  <div class="modal-overlay" id="qrModal">
-    <div class="glass-panel modal-content" style="max-width: 440px;">
-      <button class="modal-close" onclick="closeQrModal()">×</button>
-      <h3 style="margin-bottom: 12px; text-align: center;">Scan Pembayaran</h3>
+  <div class="modal-overlay" id="qrModal" role="dialog" aria-modal="true" aria-labelledby="qrModalTitle">
+    <div class="glass-panel modal-content" style="max-width: 400px;">
+      <div class="bottom-sheet-handle"></div>
+      <button type="button" class="modal-close" onclick="closeQrModal()" aria-label="Tutup">&times;</button>
+      <h3 id="qrModalTitle" style="margin-bottom: 6px; text-align: center;">Scan Pembayaran QRIS</h3>
       <div class="qr-modal-body">
         <div class="qr-image-container">
-          <img id="qrCodeImg" src="" alt="QRIS Code">
+          <img id="qrCodeImg" src="" alt="QRIS Code" style="width: 196px; height: 196px;">
         </div>
-        <div style="font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 4px;" id="qrModalAmount">Rp 0</div>
-        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;" id="qrModalTxId">Tx ID: -</div>
+        <div style="font-size: 20px; font-weight: 700; color: #ffffff; margin-bottom: 3px;" id="qrModalAmount">Rp 0</div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;" id="qrModalTxId">Tx ID: -</div>
         <div class="qr-payload-box" id="qrPayloadBox"></div>
-        <button class="btn btn-secondary btn-block btn-sm" onclick="copyQrPayload()">Salin Payload QRIS</button>
+        <button type="button" class="btn btn-primary btn-block" onclick="copyQrPayload()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          Salin Payload QRIS
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Destructive Confirmation -->
+  <div class="modal-overlay" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+    <div class="glass-panel modal-content" style="max-width: 380px;">
+      <div class="bottom-sheet-handle"></div>
+      <button type="button" class="modal-close" onclick="closeConfirmModal()" aria-label="Tutup">&times;</button>
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+        <div style="width: 34px; height: 34px; border-radius: 8px; background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        </div>
+        <h3 id="confirmModalTitle">Konfirmasi Hapus</h3>
+      </div>
+      <p id="confirmModalMessage" style="color: var(--text-secondary); font-size: 12.5px; line-height: 1.5; margin-bottom: 18px;">Apakah Anda yakin ingin melanjutkan tindakan ini?</p>
+      <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn btn-secondary btn-block" onclick="closeConfirmModal()">Batal</button>
+        <button type="button" class="btn btn-danger-solid btn-block" id="confirmModalOkBtn">Ya, Hapus</button>
       </div>
     </div>
   </div>
 
   <div class="toast-container" id="toastContainer"></div>
 
+  <!-- Mobile Log Sheet Backdrop -->
+  <div class="log-sheet-backdrop" id="logSheetBackdrop" onclick="toggleLogPanel()"></div>
+
+  <!-- Floating Log Bubble & Panel (Bottom Sheet on Mobile) -->
+  <div class="log-widget-container admin-only">
+    <button type="button" class="log-bubble-btn" id="logBubbleBtn" onclick="toggleLogPanel()" title="Tampilkan Log Aktivitas" aria-label="Tampilkan Log Aktivitas">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 17 10 11 4 5"></polyline>
+        <line x1="12" y1="19" x2="20" y2="19"></line>
+      </svg>
+      <div class="notification-badge" id="logNotificationBadge"></div>
+    </button>
+
+    <div class="glass-panel log-panel" id="logPanel" role="dialog" aria-label="Log Aktivitas Sistem">
+      <div class="bottom-sheet-handle"></div>
+      <div class="log-header">
+        <div class="log-header-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--bca-cyan);">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          <span>Log Aktivitas Sistem</span>
+        </div>
+        <div class="log-live-indicator">
+          <div class="log-live-dot"></div>
+          <span>LIVE</span>
+        </div>
+        <div class="log-actions">
+          <button type="button" class="log-action-btn" onclick="clearLocalLogs()" title="Kosongkan Tampilan" aria-label="Kosongkan log">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+          <button type="button" class="log-action-btn" onclick="toggleLogPanel()" title="Tutup" aria-label="Tutup panel log">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="log-search-container">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); flex-shrink: 0;">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" class="log-search-input" id="logSearchInput" placeholder="Filter log sistem..." oninput="filterLocalLogs()">
+      </div>
+
+      <div class="log-body" id="logBody">
+        <div style="color: var(--text-muted); text-align: center; margin-top: 20px;">Menghubungkan ke logs stream...</div>
+      </div>
+
+      <div class="log-footer">
+        <label class="log-footer-label">
+          <input type="checkbox" id="logAutoScroll" checked style="accent-color: var(--bca-blue);">
+          <span>Auto Scroll</span>
+        </label>
+        <span id="logStatusText">Terakhir diperbarui: -</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/ui-core.js"></script>
   <script>
-    // Validate session token
+    // =========================================================================
+    // 1. AUTHENTICATION & PROFILE INIT
+    // =========================================================================
     const token = localStorage.getItem('gateway_token');
     if (!token) {
       window.location.href = '/index.html';
     }
 
-    // Set profile info
-    const userEmail = localStorage.getItem('user_email');
-    const userRole = localStorage.getItem('user_role');
+    const userEmail = localStorage.getItem('user_email') || 'user@gateway.com';
+    const userRole = localStorage.getItem('user_role') || 'user';
+    const avatarChar = userEmail.charAt(0).toUpperCase();
+    const roleLabel = userRole === 'admin' ? 'Administrator' : 'User Kasir';
+
     document.getElementById('profileEmail').innerText = userEmail;
-    document.getElementById('profileRole').innerText = userRole === 'admin' ? 'Administrator' : 'User Kasir';
-    document.getElementById('userAvatar').innerText = userEmail ? userEmail.charAt(0).toUpperCase() : 'U';
+    document.getElementById('profileRole').innerText = roleLabel;
+    document.getElementById('userAvatar').innerText = avatarChar;
+    document.getElementById('mobileUserAvatar').innerText = avatarChar;
+    document.getElementById('sidebarProfileEmail').innerText = userEmail;
+    document.getElementById('sidebarProfileRole').innerText = roleLabel;
+    document.getElementById('sidebarUserAvatar').innerText = avatarChar;
 
     if (userRole !== 'admin') {
-      // Hide admin elements
-      document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.admin-only').forEach(el => { el.style.display = 'none'; });
     }
 
-    // Toast Notification System
-    const toastContainer = document.getElementById('toastContainer');
-    function showToast(message, type = 'success') {
-      const toast = document.createElement('div');
-      toast.className = `toast toast-${type}`;
-      toast.innerHTML = `<div style="font-weight: 500;">${message}</div>`;
-      toastContainer.appendChild(toast);
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
-    }
+    // =========================================================================
+    // 2. TOAST & CLIPBOARD HELPERS (Delegated to BcaUI)
+    // =========================================================================
+    const showToast = (message, type = 'success') => window.BcaUI.showToast(message, type);
+    const copyToClipboard = (text, successMsg = 'API Key disalin!') => window.BcaUI.copyToClipboard(text, successMsg);
+    const escapeHtml = (text) => window.BcaUI.escapeHtml(text);
+    const formatRupiah = (number) => window.BcaUI.formatRupiah(number);
+    const formatDateWIB = (d) => window.BcaUI.formatDateWIB(d);
 
-    // Copy to Clipboard (Supports Secure and Insecure HTTP contexts)
-    function copyToClipboard(text, successMsg = 'API Key disalin!') {
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(() => {
-          showToast(successMsg);
-        }).catch(err => {
-          fallbackCopyText(text, successMsg);
-        });
-      } else {
-        fallbackCopyText(text, successMsg);
-      }
-    }
+    // =========================================================================
+    // 3. OFF-CANVAS DRAWER, DESKTOP COLLAPSE SIDEBAR & NAVIGATION TABS
+    // =========================================================================
+    const mainSidebar = document.getElementById('mainSidebar');
+    const drawerBackdrop = document.getElementById('drawerBackdrop');
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
+    const sidebarCollapseBtn = document.getElementById('sidebarCollapseBtn');
 
-    function fallbackCopyText(text, successMsg) {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      textArea.style.top = "0";
-      textArea.style.left = "0";
-      textArea.style.position = "fixed";
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      try {
-        const successful = document.execCommand('copy');
-        if (successful) {
-          showToast(successMsg);
-        } else {
-          console.error('Fallback copy was unsuccessful');
+    function applySidebarCollapsedState(isCollapsed) {
+      document.documentElement.classList.remove('sidebar-collapsed-preload');
+      if (window.innerWidth >= 768) {
+        mainSidebar.classList.toggle('collapsed', isCollapsed);
+        document.body.classList.toggle('sidebar-collapsed', isCollapsed);
+        if (sidebarCollapseBtn) {
+          sidebarCollapseBtn.setAttribute('aria-expanded', String(!isCollapsed));
+          sidebarCollapseBtn.setAttribute('title', isCollapsed ? 'Perluas Sidebar' : 'Minimize Sidebar');
         }
-      } catch (err) {
-        console.error('Fallback copy failed:', err);
+      } else {
+        mainSidebar.classList.remove('collapsed');
+        document.body.classList.remove('sidebar-collapsed');
       }
-      document.body.removeChild(textArea);
     }
 
-    // Tab switcher
+    // Initialize sidebar collapsed state from localStorage
+    const savedSidebarCollapsed = localStorage.getItem('bca_sidebar_collapsed') === 'true';
+    applySidebarCollapsedState(savedSidebarCollapsed);
+
+    if (sidebarCollapseBtn) {
+      sidebarCollapseBtn.addEventListener('click', () => {
+        const nextState = !mainSidebar.classList.contains('collapsed');
+        localStorage.setItem('bca_sidebar_collapsed', String(nextState));
+        applySidebarCollapsedState(nextState);
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      const isCollapsed = localStorage.getItem('bca_sidebar_collapsed') === 'true';
+      applySidebarCollapsedState(isCollapsed);
+    });
+
+    function openMobileDrawer() {
+      mainSidebar.classList.add('mobile-open');
+      drawerBackdrop.classList.add('active');
+      mobileMenuBtn.setAttribute('aria-expanded', 'true');
+      window.BcaUI.setBodyScrollLock(true, 'drawer');
+    }
+
+    function closeMobileDrawer() {
+      mainSidebar.classList.remove('mobile-open');
+      drawerBackdrop.classList.remove('active');
+      mobileMenuBtn.setAttribute('aria-expanded', 'false');
+      window.BcaUI.setBodyScrollLock(false, 'drawer');
+    }
+
+    mobileMenuBtn.addEventListener('click', openMobileDrawer);
+    sidebarCloseBtn.addEventListener('click', closeMobileDrawer);
+    drawerBackdrop.addEventListener('click', closeMobileDrawer);
+
     let currentTab = 'overview';
-    const sidebarItems = document.querySelectorAll('.sidebar-item');
+    const tabMeta = {
+      overview: { title: 'Overview', subtitle: 'Ringkasan metrik gateway & aktivitas transaksi BCA QRIS real-time' },
+      merchants: { title: 'Akun BCA Merchant', subtitle: 'Konfigurasi KlikBCA Scraper, QRIS Statis & API Key toko' },
+      transactions: { title: 'Transaksi BCA QRIS', subtitle: 'Monitor status pembayaran masuk & simulasi verifikasi KlikBCA' },
+      users: { title: 'Manajemen User', subtitle: 'Pengaturan akun administrator dan operator kasir' }
+    };
+
+    const tabItems = document.querySelectorAll('.sidebar-item[data-tab]');
+    const mobileBottomTabBtns = document.querySelectorAll('.mobile-bottom-nav-link[data-mobile-tab]');
     const tabSections = document.querySelectorAll('.tab-section');
     const sectionTitle = document.getElementById('sectionTitle');
+    const sectionSubtitle = document.getElementById('sectionSubtitle');
+    const mobileTopBarTitle = document.getElementById('mobileTopBarTitle');
 
-    sidebarItems.forEach(item => {
+    function switchTab(tab, updateHash = true, forceLoad = false) {
+      if (!tab || !document.getElementById(`${tab}Tab`)) return;
+      if (tab === 'users' && userRole !== 'admin') return;
+      closeMobileDrawer();
+
+      if (!forceLoad && tab === currentTab && document.getElementById(`${tab}Tab`).classList.contains('active')) {
+        return;
+      }
+
+      tabItems.forEach(i => i.classList.toggle('active', i.getAttribute('data-tab') === tab));
+      mobileBottomTabBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-mobile-tab') === tab));
+      tabSections.forEach(s => s.classList.remove('active'));
+
+      document.getElementById(`${tab}Tab`).classList.add('active');
+      currentTab = tab;
+
+      const meta = tabMeta[tab] || { title: 'Dashboard', subtitle: '' };
+      sectionTitle.innerText = meta.title;
+      sectionSubtitle.innerText = meta.subtitle;
+      if (mobileTopBarTitle) mobileTopBarTitle.innerText = meta.title;
+
+      if (updateHash && window.location.hash !== `#${tab}`) {
+        history.replaceState(null, '', `#${tab}`);
+      }
+
+      loadTabChunks();
+    }
+
+    // Only attach tab switching to items WITH [data-tab] so external links (/docs.html, /tester.html) work natively
+    tabItems.forEach(item => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
         const tab = item.getAttribute('data-tab');
-        if (tab === currentTab) return;
-        
-        sidebarItems.forEach(i => i.classList.remove('active'));
-        tabSections.forEach(s => s.classList.remove('active'));
-        
-        item.classList.add('active');
-        document.getElementById(`${tab}Tab`).classList.add('active');
-        currentTab = tab;
-        sectionTitle.innerText = item.querySelector('a').innerText.trim();
-        
-        loadTabChunks();
+        switchTab(tab);
       });
     });
 
-    // Logout
-    document.getElementById('logoutBtn').addEventListener('click', () => {
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      try {
+        await apiRequest('/api/auth/logout', { method: 'POST' });
+      } catch (e) {}
       localStorage.clear();
       window.location.href = '/index.html';
     });
 
-    // API Helper with authentication headers
+    // Keyboard Escape closes drawer, modals, or log panel
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (mainSidebar.classList.contains('mobile-open')) closeMobileDrawer();
+        closeMerchantModal();
+        closeUserModal();
+        closeQrModal();
+        closeConfirmModal();
+        if (isPanelOpen) toggleLogPanel();
+      }
+    });
+
+    // =========================================================================
+    // 4. API REQUEST & STATE HELPERS (Skeleton / Empty / Error)
+    // =========================================================================
     async function apiRequest(url, options = {}) {
       options.headers = {
         ...options.headers,
@@ -739,7 +1083,7 @@
         if (response.status === 401) {
           localStorage.clear();
           window.location.href = '/index.html';
-          return;
+          return null;
         }
         return response;
       } catch (err) {
@@ -749,211 +1093,433 @@
       }
     }
 
-    // Data Loaders
+    function renderSkeletonState(tbodyId, cardsId, colSpan, count = 3) {
+      const tbody = document.getElementById(tbodyId);
+      const cards = document.getElementById(cardsId);
+      if (tbody) {
+        tbody.innerHTML = Array.from({ length: count }).map(() => `
+          <tr>
+            <td colspan="${colSpan}"><div class="skeleton skeleton-line" style="height: 22px;"></div></td>
+          </tr>
+        `).join('');
+      }
+      if (cards) {
+        cards.innerHTML = Array.from({ length: count }).map(() => `
+          <div class="skeleton-card">
+            <div class="skeleton" style="height: 18px; width: 65%;"></div>
+            <div class="skeleton" style="height: 28px; width: 45%;"></div>
+            <div class="skeleton" style="height: 14px; width: 85%;"></div>
+          </div>
+        `).join('');
+      }
+    }
+
+    function renderEmptyMarkup(title, desc, ctaHtml = '') {
+      return `
+        <div class="empty-state">
+          <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+            <line x1="2" y1="10" x2="22" y2="10"></line>
+          </svg>
+          <div class="empty-state-title">${escapeHtml(title)}</div>
+          <div class="empty-state-desc">${escapeHtml(desc)}</div>
+          ${ctaHtml}
+        </div>
+      `;
+    }
+
+    function showSectionError(containerId, message, retryFnName) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = `
+        <div class="error-banner">
+          <div>
+            <strong style="display: block; color: #fff;">Gagal Memuat Data</strong>
+            <span style="font-size: 0.85rem;">${escapeHtml(message)}</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="${retryFnName}()">Coba Lagi</button>
+        </div>
+      `;
+    }
+
+    function clearSectionError(containerId) {
+      const el = document.getElementById(containerId);
+      if (el) el.innerHTML = '';
+    }
+
+    // =========================================================================
+    // 5. DATA LOADERS & DUAL RENDERERS (Desktop Table + Mobile Cards)
+    // =========================================================================
     let transactionsData = [];
+    let merchantsCache = [];
+    let usersCache = [];
+    let envStatusCache = null;
+
+    async function loadEnvStatus() {
+      try {
+        const res = await apiRequest('/api/system/env-status');
+        if (res && res.ok) {
+          envStatusCache = await res.json();
+          const badge = document.getElementById('envStatusBadge');
+          const desc = document.getElementById('envStatusDesc');
+          const notice = document.getElementById('merchantEnvNotice');
+          if (envStatusCache.bca_env_ready) {
+            if (badge) {
+              badge.className = 'badge badge-success';
+              badge.innerHTML = '<span class="badge-dot"></span>.env Fallback Aktif';
+            }
+            if (desc) {
+              desc.innerHTML = `Kredensial BCA QRIS (<code>${escapeHtml(envStatusCache.bca_user_masked || 'BCA_USER')}</code> &amp; <code>STATIC_QRIS</code>) siap digunakan dari file <code>.env</code>.`;
+            }
+            if (notice) {
+              notice.style.background = 'var(--success-bg)';
+              notice.style.borderColor = 'var(--success-border)';
+              notice.innerHTML = `<strong style="color: var(--success);">✓ Terkonfigurasi di .env:</strong> Kredensial BCA (<code>${escapeHtml(envStatusCache.bca_user_masked || 'BCA_USER')}</code>) aktif di server. Kolom di bawah opsional (kosongkan jika ingin memakai <code>.env</code>).`;
+            }
+          } else if (envStatusCache.has_bca_user && envStatusCache.has_bca_pass) {
+            if (badge) {
+              badge.className = 'badge badge-success';
+              badge.innerHTML = '<span class="badge-dot"></span>.env KlikBCA Aktif';
+            }
+            if (desc) {
+              desc.innerHTML = `Kredensial KlikBCA (<code>${escapeHtml(envStatusCache.bca_user_masked || 'BCA_USER')}</code>) aktif di <code>.env</code>. QRIS Statis bersifat opsional saat pendaftaran.`;
+            }
+            if (notice) {
+              notice.style.background = 'var(--success-bg)';
+              notice.style.borderColor = 'var(--success-border)';
+              notice.innerHTML = `<strong style="color: var(--success);">✓ Kredensial KlikBCA di .env Aktif:</strong> <code>${escapeHtml(envStatusCache.bca_user_masked || 'BCA_USER')}</code> siap digunakan. Kolom di bawah opsional (QRIS Statis dapat diisi nanti sebelum generate Dynamic QRIS).`;
+            }
+          } else {
+            if (badge) {
+              badge.className = 'badge badge-pending';
+              badge.innerHTML = '<span class="badge-dot"></span>.env Belum Lengkap';
+            }
+            if (desc) {
+              desc.innerHTML = 'Kredensial fallback belum lengkap di file <code>.env</code>. Isi User &amp; Password KlikBCA per-merchant (QRIS Statis opsional) atau set di <code>.env</code>.';
+            }
+            if (notice) {
+              notice.style.background = 'var(--warning-bg)';
+              notice.style.borderColor = 'var(--warning-border)';
+              notice.innerHTML = `<strong>Info:</strong> File <code>.env</code> belum memiliki konfigurasi lengkap. Isi BCA User &amp; Password di bawah (QRIS Statis opsional, bisa diisi nanti) atau set di <code>.env</code> server.`;
+            }
+          }
+
+          const userEnvNotice = document.getElementById('userEnvNotice');
+          const addUserBtn = document.getElementById('addUserBtn');
+          if (userEnvNotice && envStatusCache.user_management_mode) {
+            const mode = envStatusCache.user_management_mode;
+            const adminMasked = envStatusCache.admin_email_masked || 'Admin .env';
+            if (mode === 'env_only') {
+              userEnvNotice.style.display = 'block';
+              userEnvNotice.style.background = 'var(--warning-bg)';
+              userEnvNotice.style.borderColor = 'var(--warning-border)';
+              userEnvNotice.innerHTML = `<strong>Mode: env_only.</strong> Seluruh akun user &amp; administrator dikunci dari file <code>.env</code> server. Pengeditan melalui Dashboard dinonaktifkan.`;
+              if (addUserBtn) addUserBtn.style.display = 'none';
+            } else if (mode === 'hybrid') {
+              userEnvNotice.style.display = 'block';
+              userEnvNotice.style.background = 'rgba(56, 189, 248, 0.08)';
+              userEnvNotice.style.borderColor = 'rgba(56, 189, 248, 0.25)';
+              userEnvNotice.innerHTML = `<strong style="color: var(--bca-cyan);">Mode: hybrid.</strong> Administrator utama (${envStatusCache.admin_env_configured ? `<code>${escapeHtml(adminMasked)}</code>` : '<code>fallback</code>'}) disinkronkan dari <code>.env</code>; operator kasir dapat dikelola langsung dari Dashboard.`;
+              if (addUserBtn) addUserBtn.style.display = 'inline-flex';
+            } else {
+              userEnvNotice.style.display = 'block';
+              userEnvNotice.style.background = 'rgba(255, 255, 255, 0.04)';
+              userEnvNotice.style.borderColor = 'var(--border-glass)';
+              userEnvNotice.innerHTML = `<strong>Mode: db_only.</strong> Konfigurasi <code>.env</code> hanya dipakai saat setup awal; seluruh user kini dikelola di database.`;
+              if (addUserBtn) addUserBtn.style.display = 'inline-flex';
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    function copyMerchantApiKeyById(id) {
+      const m = merchantsCache.find(item => item.id === id);
+      if (m && m.api_key) {
+        copyToClipboard(m.api_key, 'API Key merchant disalin!');
+      }
+    }
 
     async function loadStats() {
-      const res = await apiRequest('/api/stats');
-      if (res && res.ok) {
-        const stats = await res.json();
-        document.getElementById('statVolume').innerText = formatRupiah(stats.volume);
-        document.getElementById('statTotalTx').innerText = stats.totalTx;
-        document.getElementById('statPendingTx').innerText = `${stats.pendingTx} pending`;
-        document.getElementById('statSuccessRate').innerText = `${stats.successRate}%`;
-        document.getElementById('statSuccessCount').innerText = `${stats.successCount} sukses`;
-        document.getElementById('statActiveMerchants').innerText = stats.activeMerchants;
+      try {
+        const res = await apiRequest('/api/stats');
+        if (res && res.ok) {
+          const stats = await res.json();
+          document.getElementById('statVolume').innerText = formatRupiah(stats.volume);
+          document.getElementById('statTotalTx').innerText = stats.totalTx;
+          document.getElementById('statPendingTx').innerText = `${stats.pendingTx} pending`;
+          document.getElementById('statSuccessRate').innerText = `${stats.successRate}%`;
+          document.getElementById('statSuccessProgress').style.width = `${stats.successRate}%`;
+          document.getElementById('statSuccessCount').innerText = `${stats.successCount} sukses`;
+          document.getElementById('statActiveMerchants').innerText = stats.activeMerchants;
+        }
+      } catch (err) {
+        // Error toast already triggered
       }
     }
 
     async function loadRecentTransactions() {
-      const res = await apiRequest('/api/transactions?limit=5');
-      if (res && res.ok) {
-        const txs = await res.json();
-        const tbody = document.getElementById('recentTransactionsTableBody');
-        tbody.innerHTML = '';
-        
-        if (txs.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Tidak ada transaksi terbaru</td></tr>`;
-          return;
+      clearSectionError('recentTransactionsError');
+      renderSkeletonState('recentTransactionsTableBody', 'recentTransactionsMobileCards', 8, 3);
+      try {
+        const res = await apiRequest('/api/transactions?limit=5');
+        if (res && res.ok) {
+          const txs = await res.json();
+          renderTransactionsTargets(txs, 'recentTransactionsTableBody', 'recentTransactionsMobileCards', 'Belum ada transaksi terbaru', 'Invoice transaksi BCA QRIS yang dibuat via API akan muncul di sini.');
+        } else {
+          showSectionError('recentTransactionsError', 'Server mengembalikan respons gagal.', 'loadRecentTransactions');
         }
-
-        txs.forEach(tx => {
-          tbody.appendChild(createTxRow(tx));
-        });
+      } catch (err) {
+        showSectionError('recentTransactionsError', 'Koneksi ke server terputus.', 'loadRecentTransactions');
       }
     }
 
     async function loadMerchants() {
-      const res = await apiRequest('/api/merchants');
-      if (res && res.ok) {
+      clearSectionError('merchantsError');
+      renderSkeletonState('merchantsTableBody', 'merchantsMobileCards', 6, 2);
+      try {
+        const res = await apiRequest('/api/merchants');
+        if (!res || !res.ok) {
+          showSectionError('merchantsError', 'Gagal mengambil daftar merchant.', 'loadMerchants');
+          return;
+        }
         const merchants = await res.json();
+        merchantsCache = merchants;
+
         const tbody = document.getElementById('merchantsTableBody');
+        const cards = document.getElementById('merchantsMobileCards');
         tbody.innerHTML = '';
+        cards.innerHTML = '';
 
         if (merchants.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">Belum ada merchant terdaftar</td></tr>`;
+          const cta = userRole === 'admin' ? `<button type="button" class="btn btn-primary btn-sm" onclick="openAddMerchantModal()">Tambah Merchant Pertama</button>` : '';
+          tbody.innerHTML = `<tr><td colspan="6">${renderEmptyMarkup('Belum ada merchant terdaftar', 'Tambahkan akun KlikBCA untuk mulai menerima pembayaran QRIS Dinamis.', cta)}</td></tr>`;
+          cards.innerHTML = renderEmptyMarkup('Belum ada merchant terdaftar', 'Tambahkan akun KlikBCA untuk mulai menerima pembayaran QRIS Dinamis.', cta);
           return;
         }
 
         merchants.forEach(m => {
-          const tr = document.createElement('tr');
-
-          let bcaStatusBadge = '';
-          if (m.bca_user) {
-            let errorText = m.bca_error ? `<br><small style="color: var(--danger); font-size: 0.75rem;">(${m.bca_error})</small>` : '';
+          let bcaBadgeDesktop = '';
+          let bcaBadgeMobile = '';
+          if (m.bca_user || m.is_using_env_bca) {
+            const errorText = m.bca_error ? `<div style="color: #f87171; font-size: 11px; margin-top: 2px;">(${escapeHtml(m.bca_error)})</div>` : '';
             if (m.bca_status === 'connected') {
-              bcaStatusBadge = `<span class="badge badge-success" style="margin-left: 6px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">BCA: AKTIF</span>`;
+              bcaBadgeDesktop = `<span class="badge badge-success"><span class="badge-dot"></span>AKTIF</span>`;
+              bcaBadgeMobile = bcaBadgeDesktop;
             } else if (m.bca_status === 'cooldown') {
-              bcaStatusBadge = `<span class="badge badge-pending" style="margin-left: 6px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3);">BCA: COOLDOWN</span>${errorText}`;
+              bcaBadgeDesktop = `<span class="badge badge-pending"><span class="badge-dot"></span>COOLDOWN</span>${errorText}`;
+              bcaBadgeMobile = `<span class="badge badge-pending"><span class="badge-dot"></span>COOLDOWN</span>`;
             } else {
-              bcaStatusBadge = `<span class="badge badge-danger" style="margin-left: 6px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">BCA: OFFLINE</span>${errorText}`;
+              bcaBadgeDesktop = `<span class="badge badge-danger"><span class="badge-dot"></span>OFFLINE</span>${errorText}`;
+              bcaBadgeMobile = `<span class="badge badge-danger"><span class="badge-dot"></span>OFFLINE</span>`;
             }
-          }
-
-          let coinbaseStatusBadge = '';
-          if (m.coinbase_api_key) {
-            coinbaseStatusBadge = `<span class="badge" style="margin-left: 6px; background: rgba(96, 165, 250, 0.15); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.3);">Crypto: AKTIF</span>`;
           } else {
-            coinbaseStatusBadge = `<span class="badge" style="margin-left: 6px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">Crypto: NONAKTIF</span>`;
+            bcaBadgeDesktop = `<span class="badge badge-danger"><span class="badge-dot"></span>BELUM DISET</span>`;
+            bcaBadgeMobile = bcaBadgeDesktop;
           }
 
+          const hasBcaCredentials = Boolean(m.bca_user || m.is_using_env_bca);
+          const hasStaticQris = Boolean(m.static_qris || m.has_static_qris);
+          const syncIconSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>`;
+
+          const syncQrisBtnDesktop = (userRole === 'admin' && hasBcaCredentials)
+            ? `<button type="button" class="btn ${!hasStaticQris ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="syncMerchantQris(${Number(m.id)}, this)" title="Tarik QRIS Statis otomatis dari portal KlikBCA">${syncIconSvg}<span>${!hasStaticQris ? 'Tarik QRIS Otomatis' : 'Sync QRIS'}</span></button>`
+            : '';
+
+          const syncQrisBtnMobile = (userRole === 'admin' && hasBcaCredentials)
+            ? `<button type="button" class="btn ${!hasStaticQris ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="syncMerchantQris(${Number(m.id)}, this)" title="Tarik QRIS Statis otomatis dari portal KlikBCA">${syncIconSvg}<span>${!hasStaticQris ? 'Tarik QRIS Otomatis' : 'Sync QRIS'}</span></button>`
+            : '';
+
+          const adminActionsDesktop = userRole === 'admin'
+            ? `<div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                ${syncQrisBtnDesktop}
+                <button type="button" class="btn btn-secondary btn-sm" onclick="openEditMerchantModalById(${Number(m.id)})">Edit</button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="deleteMerchant(${Number(m.id)})">Hapus</button>
+              </div>`
+            : `<span style="font-size: 11.5px; color: var(--text-muted);">Read-Only</span>`;
+
+          const adminActionsMobile = userRole === 'admin'
+            ? `<div class="mobile-data-card-actions" style="flex-wrap: wrap;">
+                ${syncQrisBtnMobile}
+                <button type="button" class="btn btn-secondary btn-sm" onclick="openEditMerchantModalById(${Number(m.id)})">Edit Akun</button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="deleteMerchant(${Number(m.id)})">Hapus</button>
+              </div>`
+            : '';
+
+          const copyBtnDesktop = userRole === 'admin' && m.api_key
+            ? `<button type="button" class="btn btn-secondary btn-sm" style="height: 24px; min-height: 24px; padding: 0 8px; font-size: 11px;" onclick="copyMerchantApiKeyById(${Number(m.id)})">Salin</button>`
+            : `<span style="font-size: 11px; color: var(--text-muted); flex-shrink: 0;">Admin Only</span>`;
+
+          const copyBtnMobile = userRole === 'admin' && m.api_key
+            ? `<button type="button" class="btn btn-secondary btn-sm" style="flex-shrink: 0;" onclick="copyMerchantApiKeyById(${Number(m.id)})">Salin Key</button>`
+            : `<span style="font-size: 11px; color: var(--text-muted); flex-shrink: 0;">Admin Only</span>`;
+
+          const bcaUserDisplay = m.bca_user 
+            ? escapeHtml(m.bca_user) 
+            : (m.is_using_env_bca ? '<span class="badge badge-info" style="font-size:10px;">Fallback .env</span>' : '<em style="color:var(--text-muted)">Tidak dikonfigurasi</em>');
+
+          let qrisStatusDisplay = '';
+          const acqMode = m.qris_acquirer || 'bca';
+          const acqLabel = acqMode === 'dana' ? 'Route: DANA Only' : acqMode === 'multi' ? 'Route: Multi-Bank' : 'Route: BCA Only';
+          const acqBadgeClass = acqMode === 'bca' ? 'badge-info' : acqMode === 'dana' ? 'badge-pending' : 'badge-neutral';
+          const detectedNames = Array.isArray(m.detected_acquirers) && m.detected_acquirers.length > 0
+            ? m.detected_acquirers.map(a => a.name).join(' + ')
+            : '';
+
+          if (hasStaticQris) {
+            qrisStatusDisplay = `
+              <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start;">
+                <span class="badge badge-success" style="font-size: 10.5px; text-transform: none; letter-spacing: normal;"><span class="badge-dot"></span>Tersedia${!m.static_qris ? ' (via .env)' : ''}</span>
+                <span class="badge ${acqBadgeClass}" style="font-size: 10px; text-transform: none; letter-spacing: normal;" title="${detectedNames ? 'Terdeteksi pada QRIS Statis: ' + escapeHtml(detectedNames) : ''}">${acqLabel}${detectedNames ? ' • (' + escapeHtml(detectedNames) + ')' : ''}</span>
+              </div>`;
+          } else if (hasBcaCredentials) {
+            qrisStatusDisplay = `<span class="badge badge-info" style="font-size: 10.5px; text-transform: none; letter-spacing: normal;" title="Akun KlikBCA aktif. Anda dapat mengisi QRIS Statis belakangan sebelum generate QR dinamis.">QRIS: Belum diset</span>`;
+          } else {
+            qrisStatusDisplay = `<span class="badge badge-danger" style="font-size: 10.5px; text-transform: none; letter-spacing: normal;">Belum diset</span>`;
+          }
+
+          // Desktop row
+          const tr = document.createElement('tr');
           tr.innerHTML = `
-            <td style="font-weight:600; color:#fff;">${m.name}</td>
+            <td style="font-weight: 600; color: #fff;">${escapeHtml(m.name)}</td>
             <td>
-              <div>BCA: ${m.bca_user || '<em style="color:var(--text-muted)">N/A</em>'}</div>
+              <div style="color: var(--text-main); font-family: var(--font-mono); font-size: 12px;">${bcaUserDisplay}</div>
             </td>
             <td>
-              <span style="font-family: monospace; font-size:0.85rem; color:var(--text-secondary)">
-                BCA Set: ${m.bca_user ? '√' : '×'}<br>
-                Crypto Set: ${m.coinbase_api_key ? '√' : '×'}
-              </span>
+              <div style="font-size: 12px;">${qrisStatusDisplay}</div>
             </td>
             <td>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span class="qr-payload-box" style="padding:4px 8px; border-radius:4px; max-height:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px; margin-bottom:0;">
-                  ${m.api_key}
-                </span>
-                <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${m.api_key}')">Salin</button>
+              <div class="api-key-pill">
+                <span class="api-key-text" title="${escapeHtml(m.api_key || '')}">${escapeHtml(m.api_key || '-')}</span>
+                ${copyBtnDesktop}
               </div>
             </td>
-            <td>
-              <div style="display:flex; flex-direction:column; gap:4px;">
-                <span class="badge badge-success" style="width:fit-content;">Status: ${m.status}</span>
-                ${bcaStatusBadge}
-                ${coinbaseStatusBadge}
-              </div>
-            </td>
-            <td>
-              <div style="display:flex; gap:8px;">
-                <button class="btn btn-secondary btn-sm" onclick="openEditMerchantModal(${JSON.stringify(m).replace(/"/g, '&quot;')})">Edit</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteMerchant(${m.id})">Hapus</button>
-              </div>
-            </td>
+            <td>${bcaBadgeDesktop}</td>
+            <td>${adminActionsDesktop}</td>
           `;
           tbody.appendChild(tr);
+
+          // Mobile Card
+          const card = document.createElement('div');
+          card.className = 'mobile-data-card';
+          card.innerHTML = `
+            <div class="mobile-data-card-header">
+              <div style="flex: 1; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word;">
+                <div class="mobile-card-title" style="font-weight: 600; color: #fff; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word;">${escapeHtml(m.name)}</div>
+                <div class="mobile-card-value" style="font-size: 12px; color: var(--text-secondary); margin-top: 2px; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word;">
+                  BCA: ${bcaUserDisplay}
+                </div>
+              </div>
+              <div style="flex-shrink: 0;">
+                ${bcaBadgeMobile}
+              </div>
+            </div>
+            <div style="min-width: 0; max-width: 100%;">
+              <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;">API Key Toko</div>
+              <div class="api-key-pill" style="min-width: 0; max-width: 100%;">
+                <span class="api-key-text" style="flex: 1; min-width: 0; max-width: 100%; white-space: normal; word-break: break-all;">${escapeHtml(m.api_key || '-')}</span>
+                ${copyBtnMobile}
+              </div>
+            </div>
+            <div class="mobile-card-value" style="font-size: 12px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word;">
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"><span>• Kredensial QRIS:</span> ${qrisStatusDisplay}</div>
+              ${m.bca_error ? `<div style="color: #f87171; overflow-wrap: anywhere; word-break: break-word;">• Catatan: ${escapeHtml(m.bca_error)}</div>` : ''}
+            </div>
+            ${adminActionsMobile}
+          `;
+          cards.appendChild(card);
         });
+      } catch (err) {
+        showSectionError('merchantsError', 'Gagal terhubung ke server.', 'loadMerchants');
       }
     }
 
     async function loadTransactions() {
-      const res = await apiRequest('/api/transactions');
-      if (res && res.ok) {
-        transactionsData = await res.json();
-        renderTransactionsTable(transactionsData);
+      clearSectionError('transactionsError');
+      renderSkeletonState('transactionsTableBody', 'transactionsMobileCards', 8, 4);
+      try {
+        const res = await apiRequest('/api/transactions');
+        if (res && res.ok) {
+          transactionsData = await res.json();
+          filterTransactions();
+        } else {
+          showSectionError('transactionsError', 'Gagal mengambil daftar transaksi.', 'loadTransactions');
+        }
+      } catch (err) {
+        showSectionError('transactionsError', 'Koneksi ke server terputus.', 'loadTransactions');
       }
     }
 
-    function renderTransactionsTable(txs) {
-      const tbody = document.getElementById('transactionsTableBody');
+    function renderTransactionsTargets(txs, tbodyId, cardsId, emptyTitle, emptyDesc) {
+      const tbody = document.getElementById(tbodyId);
+      const cards = document.getElementById(cardsId);
       tbody.innerHTML = '';
+      cards.innerHTML = '';
 
       if (txs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Tidak ada transaksi ditemukan</td></tr>`;
+        const cta = `<a href="/tester.html" class="btn btn-primary btn-sm">Buka API Tester</a>`;
+        tbody.innerHTML = `<tr><td colspan="8">${renderEmptyMarkup(emptyTitle, emptyDesc, cta)}</td></tr>`;
+        cards.innerHTML = renderEmptyMarkup(emptyTitle, emptyDesc, cta);
         return;
       }
 
       txs.forEach(tx => {
         tbody.appendChild(createTxRow(tx));
+        cards.appendChild(createTxMobileCard(tx));
       });
     }
 
     function filterTransactions() {
-      const search = document.getElementById('txSearchInput').value.toLowerCase();
+      const search = (document.getElementById('txSearchInput').value || '').toLowerCase();
       const status = document.getElementById('txFilterStatus').value;
 
       const filtered = transactionsData.filter(tx => {
-        const matchesSearch = tx.id.toString().includes(search) || 
-                              tx.external_id.toLowerCase().includes(search);
+        const matchesSearch =
+          tx.id.toString().includes(search) ||
+          (tx.external_id || '').toLowerCase().includes(search) ||
+          (tx.merchant_name || '').toLowerCase().includes(search);
         const matchesStatus = status === 'all' || tx.status === status;
         return matchesSearch && matchesStatus;
       });
 
-      renderTransactionsTable(filtered);
+      renderTransactionsTargets(
+        filtered,
+        'transactionsTableBody',
+        'transactionsMobileCards',
+        'Tidak ada transaksi ditemukan',
+        'Coba ubah kata kunci pencarian atau filter status transaksi.'
+      );
     }
 
-    async function loadUsers() {
-      const res = await apiRequest('/api/users');
-      if (res && res.ok) {
-        const users = await res.json();
-        const tbody = document.getElementById('usersTableBody');
-        tbody.innerHTML = '';
-
-        users.forEach(u => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${u.id}</td>
-            <td style="font-weight:600; color:#fff;">${u.email}</td>
-            <td><span class="badge ${u.role === 'admin' ? 'badge-success' : 'badge-pending'}">${u.role}</span></td>
-            <td>${new Date(u.created_at + ' UTC').toLocaleString('id-ID')}</td>
-            <td>
-              <div style="display:flex; gap:8px;">
-                <button class="btn btn-secondary btn-sm" onclick="openEditUserModal(${JSON.stringify(u).replace(/"/g, '&quot;')})">Edit</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})" ${u.email === 'admin@gateway.com' ? 'disabled' : ''}>Hapus</button>
-              </div>
-            </td>
-          `;
-          tbody.appendChild(tr);
-        });
-      }
+    function getTxActionMarkup(tx) {
+      const actionBtn = `<button type="button" class="btn btn-primary btn-sm" onclick="viewQrByTxId(${tx.id})">Lihat QR</button>`;
+      const simulateBtn = (userRole === 'admin' && tx.status === 'pending')
+        ? `<button type="button" class="btn btn-secondary btn-sm" onclick="simulatePayment(${tx.id})">Simulasi Bayar</button>`
+        : '';
+      return { actionBtn, simulateBtn };
     }
 
     function createTxRow(tx) {
       const tr = document.createElement('tr');
-      const dateStr = new Date(tx.created_at + ' UTC').toLocaleString('id-ID');
-      const statusBadge = tx.status === 'success' ? 
-        `<span class="badge badge-success">Sukses</span>` : 
-        `<span class="badge badge-pending">Pending</span>`;
+      const dateStr = formatDateWIB(tx.created_at);
+      const statusBadge = tx.status === 'success'
+        ? `<span class="badge badge-success"><span class="badge-dot"></span>Sukses</span>`
+        : `<span class="badge badge-pending"><span class="badge-dot"></span>Pending</span>`;
 
-      const methodBadge = tx.payment_method === 'crypto' ? 
-        `<span class="badge" style="background: rgba(96, 165, 250, 0.15); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.3);">Crypto</span>` : 
-        `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">QRIS</span>`;
-
-      let actionBtn = '';
-      if (tx.payment_method === 'crypto') {
-        const parts = (tx.coinbase_charge_code || '').split(':');
-        const walletAddress = parts[0];
-        if (parts.length === 4 || (walletAddress && walletAddress.startsWith('0x'))) {
-          actionBtn = `<a class="btn btn-primary btn-sm" href="https://etherscan.io/address/${walletAddress}" target="_blank" style="display:inline-flex; align-items:center; justify-content:center; text-decoration:none;">Cek Etherscan</a>`;
-        } else {
-          actionBtn = `<a class="btn btn-primary btn-sm" href="https://commerce.coinbase.com/charges/${tx.coinbase_charge_code}" target="_blank" style="display:inline-flex; align-items:center; justify-content:center; text-decoration:none;">Link Coinbase</a>`;
-        }
-      } else {
-        actionBtn = `<button class="btn btn-primary btn-sm" onclick="viewQrModal('${tx.qris_image}', '${tx.qris_string}', ${tx.amount}, '${tx.external_id}')">Lihat QR</button>`;
-      }
-
-      const simulateBtn = (tx.status === 'pending') ? 
-        `<button class="btn btn-secondary btn-sm" onclick="simulatePayment(${tx.id})">Simulasi Bayar</button>` : '';
+      const methodBadge = `<span class="badge badge-info">BCA QRIS</span>`;
+      const { actionBtn, simulateBtn } = getTxActionMarkup(tx);
+      txMap[tx.id] = tx;
 
       tr.innerHTML = `
-        <td>#${tx.id}</td>
-        <td style="font-weight:500;">${tx.merchant_name}</td>
-        <td style="font-family:monospace; font-size:0.85rem;">${tx.external_id}</td>
+        <td class="font-mono" style="color: var(--text-secondary); font-size: 12px;">#${tx.id}</td>
+        <td style="font-weight: 600; color: #fff;">${escapeHtml(tx.merchant_name)}</td>
+        <td class="font-mono" style="font-size: 12px;">${escapeHtml(tx.external_id)}</td>
         <td>${methodBadge}</td>
-        <td style="font-weight:600; color:#fff;">${formatRupiah(tx.amount)}</td>
+        <td style="font-weight: 700; color: #fff;" class="tabular-nums">${formatRupiah(tx.amount)}</td>
         <td>${statusBadge}</td>
-        <td>${dateStr}</td>
+        <td style="font-size: 11.5px; color: var(--text-secondary); white-space: nowrap;">${dateStr}</td>
         <td>
-          <div style="display:flex; gap:8px;">
+          <div style="display: flex; gap: 6px;">
             ${actionBtn}
             ${simulateBtn}
           </div>
@@ -962,51 +1528,229 @@
       return tr;
     }
 
+    function createTxMobileCard(tx) {
+      const card = document.createElement('div');
+      card.className = 'mobile-data-card';
+      const dateStr = formatDateWIB(tx.created_at);
+      const statusBadge = tx.status === 'success'
+        ? `<span class="badge badge-success"><span class="badge-dot"></span>Sukses</span>`
+        : `<span class="badge badge-pending"><span class="badge-dot"></span>Pending</span>`;
+      const methodBadge = `<span class="badge badge-info">BCA QRIS</span>`;
+
+      const { actionBtn, simulateBtn } = getTxActionMarkup(tx);
+      txMap[tx.id] = tx;
+
+      card.innerHTML = `
+        <div class="mobile-data-card-header">
+          <div style="flex: 1; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word;">
+            <div class="mobile-card-title" style="font-weight: 600; color: #fff; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word;">#TX-${tx.id} • ${escapeHtml(tx.merchant_name)}</div>
+            <div class="font-mono mobile-card-value" style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word;">${escapeHtml(tx.external_id)}</div>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;">
+            ${statusBadge}
+            ${methodBadge}
+          </div>
+        </div>
+        <div style="min-width: 0; max-width: 100%;">
+          <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Nominal Transaksi</div>
+          <div class="mobile-card-value tabular-nums" style="font-size: 18px; font-weight: 700; color: #fff; font-family: var(--font-display); min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word;">${formatRupiah(tx.amount)}</div>
+        </div>
+        <div class="mobile-data-card-row mobile-card-row" style="font-size: 11.5px; color: var(--text-muted);">
+          <span>Waktu:</span>
+          <span class="mobile-card-value" style="color: var(--text-secondary);">${dateStr}</span>
+        </div>
+        <div class="mobile-data-card-actions">
+          ${actionBtn}
+          ${simulateBtn}
+        </div>
+      `;
+      return card;
+    }
+
+    const txMap = {};
+
+    async function loadUsers() {
+      clearSectionError('usersError');
+      renderSkeletonState('usersTableBody', 'usersMobileCards', 6, 2);
+      if (!envStatusCache) await loadEnvStatus();
+      try {
+        const res = await apiRequest('/api/users');
+        if (!res || !res.ok) {
+          showSectionError('usersError', 'Gagal mengambil data pengguna.', 'loadUsers');
+          return;
+        }
+        const users = await res.json();
+        usersCache = users;
+
+        const tbody = document.getElementById('usersTableBody');
+        const cards = document.getElementById('usersMobileCards');
+        tbody.innerHTML = '';
+        cards.innerHTML = '';
+
+        const isEnvOnlyMode = envStatusCache && envStatusCache.user_management_mode === 'env_only';
+        const lockEnvUsers = envStatusCache ? Boolean(envStatusCache.lock_env_managed_users) : true;
+
+        users.forEach(u => {
+          const dateStr = formatDateWIB(u.created_at);
+          const roleBadge = `<span class="badge ${u.role === 'admin' ? 'badge-success' : 'badge-pending'}"><span class="badge-dot"></span>${escapeHtml(u.role)}</span>`;
+          const isPrimaryAdmin = Boolean(u.is_primary_admin);
+          const isEnvManaged = Boolean(u.managed_by_env);
+          const isActive = u.is_active !== false && u.is_active !== 0;
+
+          const primaryTag = isPrimaryAdmin
+            ? `<span class="badge badge-info" style="font-size: 10px; margin-left: 6px;" title="Administrator utama dilindungi dari penghapusan">Primary</span>`
+            : '';
+          const envTag = isEnvManaged
+            ? `<span class="badge" style="background: rgba(56, 189, 248, 0.14); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 10px; margin-left: 6px;" title="Dikelola melalui file .env server">.env</span>`
+            : '';
+          const statusBadge = isActive
+            ? `<span class="badge badge-success" style="font-size: 10.5px;">Aktif</span>`
+            : `<span class="badge badge-danger" style="font-size: 10.5px;">Nonaktif</span>`;
+
+          const isEnvProtected = isEnvManaged && lockEnvUsers;
+          const canEdit = !isEnvOnlyMode && !(isEnvProtected && isPrimaryAdmin);
+          const canDelete = !isPrimaryAdmin && !isEnvOnlyMode && !isEnvProtected;
+
+          const editTitle = isEnvOnlyMode
+            ? 'Terkunci pada mode env_only'
+            : (isEnvProtected ? 'Email & password dikelola melalui .env' : 'Edit user');
+          const deleteTitle = isPrimaryAdmin
+            ? 'Admin utama tidak dapat dihapus'
+            : (isEnvOnlyMode ? 'Terkunci pada mode env_only' : (isEnvProtected ? 'Akun dari .env diproteksi dari penghapusan' : 'Hapus user'));
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="font-mono" style="color: var(--text-secondary);">#${u.id}</td>
+            <td style="font-weight: 600; color: #fff;">
+              <span>${escapeHtml(u.email)}</span>${primaryTag}${envTag}
+            </td>
+            <td>${roleBadge}</td>
+            <td>${statusBadge}</td>
+            <td style="font-size: 0.84rem; color: var(--text-secondary);">${dateStr}</td>
+            <td>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="openEditUserModalById(${u.id})" ${isEnvOnlyMode || (isEnvProtected && isPrimaryAdmin) ? `disabled title="${escapeHtml(editTitle)}"` : ''}>Edit</button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})" ${!canDelete ? `disabled title="${escapeHtml(deleteTitle)}"` : ''}>Hapus</button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(tr);
+
+          const card = document.createElement('div');
+          card.className = 'mobile-data-card';
+          card.innerHTML = `
+            <div class="mobile-data-card-header">
+              <div style="flex: 1; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word;">
+                <div class="mobile-card-title" style="font-weight: 700; color: #fff; word-break: break-all; overflow-wrap: anywhere; min-width: 0; max-width: 100%;">${escapeHtml(u.email)} ${primaryTag}${envTag}</div>
+                <div class="font-mono mobile-card-value" style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word;">User ID #${u.id}</div>
+              </div>
+              <div style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                ${roleBadge}
+                ${statusBadge}
+              </div>
+            </div>
+            <div class="mobile-data-card-row mobile-card-row" style="font-size: 0.8rem; color: var(--text-muted);">
+              <span>Terdaftar:</span>
+              <span class="mobile-card-value" style="color: var(--text-secondary);">${dateStr}</span>
+            </div>
+            <div class="mobile-data-card-actions">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="openEditUserModalById(${u.id})" ${!canEdit ? `disabled title="${escapeHtml(editTitle)}"` : ''}>Edit User</button>
+              <button type="button" class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})" ${!canDelete ? `disabled title="${escapeHtml(deleteTitle)}"` : ''}>Hapus</button>
+            </div>
+          `;
+          cards.appendChild(card);
+        });
+      } catch (err) {
+        showSectionError('usersError', 'Koneksi terputus saat memuat user.', 'loadUsers');
+      }
+    }
+
     function loadTabChunks() {
       if (currentTab === 'overview') {
         loadStats();
+        loadEnvStatus();
         loadRecentTransactions();
       } else if (currentTab === 'merchants') {
+        loadEnvStatus();
         loadMerchants();
       } else if (currentTab === 'transactions') {
         loadTransactions();
       } else if (currentTab === 'users' && userRole === 'admin') {
+        loadEnvStatus();
         loadUsers();
       }
     }
 
-    // Modal Operations
+    const toggleBcaPassBtn = document.getElementById('toggleBcaPassBtn');
+    if (toggleBcaPassBtn) {
+      toggleBcaPassBtn.addEventListener('click', () => {
+        const input = document.getElementById('bcaPass');
+        const isPass = input.getAttribute('type') === 'password';
+        input.setAttribute('type', isPass ? 'text' : 'password');
+        toggleBcaPassBtn.setAttribute('title', isPass ? 'Sembunyikan password' : 'Tampilkan password');
+      });
+    }
+
+    // =========================================================================
+    // 6. MODALS & CRUD ACTIONS
+    // =========================================================================
     function openAddMerchantModal() {
+      if (!envStatusCache) loadEnvStatus();
       document.getElementById('merchantForm').reset();
       document.getElementById('merchantId').value = '';
-      document.getElementById('merchantModalTitle').innerText = 'Tambah Akun BCA/Crypto Merchant';
+      document.getElementById('bcaPass').setAttribute('type', 'password');
+      document.getElementById('bcaUser').placeholder = 'kasir@toko.com (kosongkan jika pakai .env)';
+      document.getElementById('bcaPass').placeholder = '•••••••• (kosongkan jika pakai .env)';
+      document.getElementById('staticQris').placeholder = '00020101021138530015ID.CO.QRIS... (opsional, bisa diisi nanti)';
+      document.getElementById('qrisAcquirer').value = 'bca';
+      document.getElementById('merchantModalTitle').innerText = 'Tambah Akun BCA Merchant';
       document.getElementById('merchantModal').classList.add('active');
+      window.BcaUI.setBodyScrollLock(true, 'merchantModal');
+    }
+
+    function openEditMerchantModalById(id) {
+      const m = merchantsCache.find(item => item.id === id);
+      if (m) openEditMerchantModal(m);
     }
 
     function openEditMerchantModal(m) {
+      if (!envStatusCache) loadEnvStatus();
       document.getElementById('merchantId').value = m.id;
-      document.getElementById('merchantName').value = m.name;
+      document.getElementById('merchantName').value = m.name || '';
       document.getElementById('bcaUser').value = m.bca_user || '';
-      document.getElementById('bcaPass').value = m.bca_pass || '';
+      document.getElementById('bcaPass').value = '';
+      document.getElementById('bcaPass').setAttribute('type', 'password');
+      document.getElementById('bcaPass').placeholder = m.has_bca_pass ? '•••••••• (Kosongkan jika tidak diubah)' : '•••••••• (kosongkan jika pakai .env)';
       document.getElementById('staticQris').value = m.static_qris || '';
-      document.getElementById('coinbaseApiKey').value = m.coinbase_api_key || '';
-      document.getElementById('coinbaseWebhookSecret').value = m.coinbase_webhook_secret || '';
-      document.getElementById('merchantModalTitle').innerText = 'Edit Akun BCA/Crypto Merchant';
+      document.getElementById('qrisAcquirer').value = m.qris_acquirer || 'bca';
+      document.getElementById('merchantModalTitle').innerText = 'Edit Akun BCA Merchant';
       document.getElementById('merchantModal').classList.add('active');
+      window.BcaUI.setBodyScrollLock(true, 'merchantModal');
     }
 
     function closeMerchantModal() {
       document.getElementById('merchantModal').classList.remove('active');
+      window.BcaUI.setBodyScrollLock(false, 'merchantModal');
     }
 
     function openAddUserModal() {
       document.getElementById('userForm').reset();
       document.getElementById('userId').value = '';
+      document.getElementById('userEmail').removeAttribute('readonly');
+      document.getElementById('userPassword').removeAttribute('disabled');
+      document.getElementById('userRole').disabled = false;
+      document.getElementById('userActiveGroup').style.display = 'none';
       document.getElementById('userPassword').setAttribute('required', 'required');
       document.getElementById('userPasswordHelp').style.display = 'none';
       document.getElementById('userModalTitle').innerText = 'Tambah User Baru';
       document.getElementById('userSubmitBtn').innerText = 'Tambah';
       document.getElementById('userModal').classList.add('active');
+      window.BcaUI.setBodyScrollLock(true, 'userModal');
+    }
+
+    function openEditUserModalById(id) {
+      const u = usersCache.find(item => item.id === id);
+      if (u) openEditUserModal(u);
     }
 
     function openEditUserModal(u) {
@@ -1014,19 +1758,50 @@
       document.getElementById('userId').value = u.id;
       document.getElementById('userEmail').value = u.email;
       document.getElementById('userRole').value = u.role;
+      const isPrimaryAdmin = Boolean(u.is_primary_admin);
+      const lockEnv = envStatusCache ? Boolean(envStatusCache.lock_env_managed_users) : true;
+      const isEnvLocked = Boolean(u.managed_by_env) && lockEnv;
+
+      if (isPrimaryAdmin || isEnvLocked) {
+        document.getElementById('userEmail').setAttribute('readonly', 'readonly');
+        document.getElementById('userPassword').setAttribute('disabled', 'disabled');
+      } else {
+        document.getElementById('userEmail').removeAttribute('readonly');
+        document.getElementById('userPassword').removeAttribute('disabled');
+      }
+
+      if (isPrimaryAdmin) {
+        document.getElementById('userRole').disabled = true;
+        document.getElementById('userActiveGroup').style.display = 'none';
+      } else {
+        document.getElementById('userRole').disabled = false;
+        document.getElementById('userActiveGroup').style.display = 'block';
+        document.getElementById('userActive').value = (u.is_active === false || u.is_active === 0) ? '0' : '1';
+      }
+
       document.getElementById('userPassword').removeAttribute('required');
       document.getElementById('userPasswordHelp').style.display = 'block';
+      document.getElementById('userPasswordHelp').innerText = isEnvLocked
+        ? 'Password akun ini dikelola melalui file .env server.'
+        : 'Kosongkan jika tidak ingin mengubah password.';
       document.getElementById('userModalTitle').innerText = 'Edit User';
       document.getElementById('userSubmitBtn').innerText = 'Simpan';
       document.getElementById('userModal').classList.add('active');
+      window.BcaUI.setBodyScrollLock(true, 'userModal');
     }
 
     function closeUserModal() {
       document.getElementById('userModal').classList.remove('active');
+      window.BcaUI.setBodyScrollLock(false, 'userModal');
     }
 
-    // QRIS Viewer Modal
     let activeQrPayload = '';
+    function viewQrByTxId(txId) {
+      const tx = txMap[txId];
+      if (!tx) return;
+      viewQrModal(tx.qris_image, tx.qris_string, tx.amount, tx.external_id);
+    }
+
     function viewQrModal(image, payload, amount, extId) {
       document.getElementById('qrCodeImg').src = image;
       document.getElementById('qrModalAmount').innerText = formatRupiah(amount);
@@ -1034,55 +1809,72 @@
       document.getElementById('qrPayloadBox').innerText = payload;
       activeQrPayload = payload;
       document.getElementById('qrModal').classList.add('active');
+      window.BcaUI.setBodyScrollLock(true, 'qrModal');
     }
 
     function closeQrModal() {
       document.getElementById('qrModal').classList.remove('active');
+      window.BcaUI.setBodyScrollLock(false, 'qrModal');
     }
 
     function copyQrPayload() {
       copyToClipboard(activeQrPayload, 'Payload QRIS disalin ke clipboard!');
     }
 
-    // Forms Submission handlers
+    // Destructive Confirmation Modal
+    let pendingConfirmCallback = null;
+    function openConfirmModal(title, message, onConfirm) {
+      document.getElementById('confirmModalTitle').innerText = title;
+      document.getElementById('confirmModalMessage').innerText = message;
+      pendingConfirmCallback = onConfirm;
+      document.getElementById('confirmModal').classList.add('active');
+      window.BcaUI.setBodyScrollLock(true, 'confirmModal');
+    }
+
+    function closeConfirmModal() {
+      document.getElementById('confirmModal').classList.remove('active');
+      window.BcaUI.setBodyScrollLock(false, 'confirmModal');
+      pendingConfirmCallback = null;
+    }
+
+    document.getElementById('confirmModalOkBtn').addEventListener('click', async () => {
+      const cb = pendingConfirmCallback;
+      closeConfirmModal();
+      if (typeof cb === 'function') await cb();
+    });
+
+    // Close modal on backdrop tap
+    ['merchantModal', 'userModal', 'qrModal', 'confirmModal'].forEach(modalId => {
+      const el = document.getElementById(modalId);
+      el.addEventListener('click', (e) => {
+        if (e.target === el) {
+          el.classList.remove('active');
+          window.BcaUI.setBodyScrollLock(false, modalId);
+        }
+      });
+    });
+
+    // Form Submissions
     document.getElementById('merchantForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const id = document.getElementById('merchantId').value;
-      const name = document.getElementById('merchantName').value;
-      const bca_user = document.getElementById('bcaUser').value;
+      const name = document.getElementById('merchantName').value.trim();
+      const bca_user = document.getElementById('bcaUser').value.trim();
       const bca_pass = document.getElementById('bcaPass').value;
-      const static_qris = document.getElementById('staticQris').value;
-      const coinbase_api_key = document.getElementById('coinbaseApiKey').value;
-      const coinbase_webhook_secret = document.getElementById('coinbaseWebhookSecret').value;
+      const static_qris = document.getElementById('staticQris').value.trim();
+      const qris_acquirer = document.getElementById('qrisAcquirer').value;
 
-      const hasBca = bca_user && bca_pass && static_qris;
-      const hasCoinbase = coinbase_api_key && coinbase_webhook_secret;
+      const payload = { name, bca_user, bca_pass, static_qris, qris_acquirer };
+      const url = id ? `/api/merchants/${id}` : '/api/merchants';
+      const method = id ? 'PUT' : 'POST';
 
-      if (!hasBca && !hasCoinbase) {
-        showToast('Kredensial KlikBCA Merchant atau Coinbase Commerce harus lengkap diisi salah satu', 'error');
-        return;
-      }
-
-      const payload = { name, bca_user, bca_pass, static_qris, coinbase_api_key, coinbase_webhook_secret };
-      
-      let url = '/api/merchants';
-      let method = 'POST';
-
-      if (id) {
-        url = `/api/merchants/${id}`;
-        method = 'PUT';
-      }
-
-      const res = await apiRequest(url, {
-        method,
-        body: JSON.stringify(payload)
-      });
-
+      const res = await apiRequest(url, { method, body: JSON.stringify(payload) });
       if (res && res.ok) {
         showToast(id ? 'Merchant berhasil diperbarui!' : 'Merchant berhasil ditambahkan!');
         closeMerchantModal();
         loadMerchants();
-      } else {
+        loadStats();
+      } else if (res) {
         const data = await res.json();
         showToast(data.message || 'Gagal menyimpan data merchant', 'error');
       }
@@ -1094,78 +1886,119 @@
       const email = document.getElementById('userEmail').value;
       const password = document.getElementById('userPassword').value;
       const role = document.getElementById('userRole').value;
+      const isActiveEl = document.getElementById('userActive');
 
-      // Validate password for new users
       if (!id && (!password || password.trim() === '')) {
         showToast('Password wajib diisi untuk user baru', 'error');
         return;
       }
 
-      let url = '/api/users';
-      let method = 'POST';
-      if (id) {
-        url = `/api/users/${id}`;
-        method = 'PUT';
+      const url = id ? `/api/users/${id}` : '/api/users';
+      const method = id ? 'PUT' : 'POST';
+      const payload = { email, password, role };
+      if (id && isActiveEl && document.getElementById('userActiveGroup').style.display !== 'none') {
+        payload.is_active = isActiveEl.value === '1';
       }
 
-      const res = await apiRequest(url, {
-        method: method,
-        body: JSON.stringify({ email, password, role })
-      });
-
+      const res = await apiRequest(url, { method, body: JSON.stringify(payload) });
       if (res && res.ok) {
         showToast(id ? 'Data user berhasil diperbarui!' : 'User baru berhasil ditambahkan!');
         closeUserModal();
         loadUsers();
-      } else {
+      } else if (res) {
         const data = await res.json();
         showToast(data.message || 'Gagal menyimpan data user', 'error');
       }
     });
 
-    // Delete Operations
-    async function deleteMerchant(id) {
-      if (!confirm('Apakah Anda yakin ingin menghapus akun merchant ini beserta transaksinya?')) return;
-      const res = await apiRequest(`/api/merchants/${id}`, { method: 'DELETE' });
-      if (res && res.ok) {
-        showToast('Merchant berhasil dihapus!');
-        loadMerchants();
+    async function syncMerchantQris(id, btnEl) {
+      const origHtml = btnEl ? btnEl.innerHTML : '';
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = 'Menarik QRIS...';
+      }
+      try {
+        const res = await apiRequest(`/api/merchants/${id}/sync-qris`, { method: 'POST' });
+        if (res && res.ok) {
+          const data = await res.json();
+          showToast(data.message || 'QRIS Statis berhasil disinkronkan!');
+          loadEnvStatus();
+          loadMerchants();
+        } else if (res) {
+          const d = await res.json().catch(() => ({}));
+          showToast(d.message || 'Gagal menarik QRIS Statis dari KlikBCA', 'error');
+        }
+      } catch (err) {
+        // Error toast already triggered by apiRequest
+      } finally {
+        if (btnEl && document.body.contains(btnEl)) {
+          btnEl.disabled = false;
+          btnEl.innerHTML = origHtml;
+        }
       }
     }
 
-    async function deleteUser(id) {
-      if (!confirm('Apakah Anda yakin ingin menghapus user ini?')) return;
-      const res = await apiRequest(`/api/users/${id}`, { method: 'DELETE' });
-      if (res && res.ok) {
-        showToast('User berhasil dihapus!');
-        loadUsers();
-      }
+    function deleteMerchant(id) {
+      openConfirmModal(
+        'Hapus Akun Merchant',
+        'Apakah Anda yakin ingin menghapus akun merchant ini beserta seluruh riwayat transaksinya? Tindakan ini tidak dapat dibatalkan.',
+        async () => {
+          const res = await apiRequest(`/api/merchants/${id}`, { method: 'DELETE' });
+          if (res && res.ok) {
+            showToast('Merchant berhasil dihapus!');
+            loadMerchants();
+            loadStats();
+          } else if (res) {
+            const d = await res.json();
+            showToast(d.message || 'Gagal menghapus merchant', 'error');
+          }
+        }
+      );
     }
 
-    // Simulate Payment trigger
+    function deleteUser(id) {
+      openConfirmModal(
+        'Hapus Pengguna',
+        'Apakah Anda yakin ingin menghapus user ini dari sistem gateway?',
+        async () => {
+          const res = await apiRequest(`/api/users/${id}`, { method: 'DELETE' });
+          if (res && res.ok) {
+            showToast('User berhasil dihapus!');
+            loadUsers();
+          } else if (res) {
+            const d = await res.json();
+            showToast(d.message || 'Gagal menghapus user', 'error');
+          }
+        }
+      );
+    }
+
     async function simulatePayment(id) {
       const res = await apiRequest(`/api/transactions/${id}/simulate-payment`, { method: 'POST' });
       if (res && res.ok) {
         showToast('Simulasi sukses! Dana terkonfirmasi masuk.');
         loadTabChunks();
+      } else if (res) {
+        const d = await res.json();
+        showToast(d.message || 'Gagal memicu simulasi', 'error');
       }
     }
 
-    // Utilities
-    function formatRupiah(number) {
-      return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0
-      }).format(number);
-    }
-
-    // Logs Widget Functionality
+    // =========================================================================
+    // 7. LIVE SYSTEM LOGS WIDGET
+    // =========================================================================
     let logPollInterval = null;
     let cachedLogs = [];
     let isPanelOpen = false;
-    let hasUnreadAlerts = false;
     let lastFetchedLogTimestamp = null;
+
+    function setLogBadgeVisibility(visible) {
+      const val = visible ? 'block' : 'none';
+      const b1 = document.getElementById('logNotificationBadge');
+      const b2 = document.getElementById('mobileLogNotificationBadge');
+      if (b1) b1.style.display = val;
+      if (b2) b2.style.display = val;
+    }
 
     async function fetchLogs() {
       try {
@@ -1175,15 +2008,14 @@
           if (logs.length > 0) {
             const newestLog = logs[0];
             const newestTimeStr = newestLog.timestamp + '_' + newestLog.message;
-            
+
             if (newestTimeStr !== lastFetchedLogTimestamp) {
               if (!isPanelOpen && lastFetchedLogTimestamp !== null) {
                 for (const entry of logs) {
                   const entryKey = entry.timestamp + '_' + entry.message;
                   if (entryKey === lastFetchedLogTimestamp) break;
                   if (entry.type === 'warn' || entry.type === 'error') {
-                    hasUnreadAlerts = true;
-                    document.getElementById('logNotificationBadge').style.display = 'block';
+                    setLogBadgeVisibility(true);
                     break;
                   }
                 }
@@ -1203,59 +2035,68 @@
 
     function renderLogs() {
       const logBody = document.getElementById('logBody');
-      const searchVal = document.getElementById('logSearchInput').value.toLowerCase();
-      
+      const searchVal = (document.getElementById('logSearchInput').value || '').toLowerCase();
+
       let logsToRender = [...cachedLogs].reverse();
-      
+
       if (searchVal) {
-        logsToRender = logsToRender.filter(log => 
-          log.message.toLowerCase().includes(searchVal) || 
-          log.type.toLowerCase().includes(searchVal) ||
-          log.timestamp.includes(searchVal)
+        logsToRender = logsToRender.filter(log =>
+          (log.message || '').toLowerCase().includes(searchVal) ||
+          (log.type || '').toLowerCase().includes(searchVal) ||
+          (log.timestamp || '').includes(searchVal)
         );
       }
-      
+
       if (logsToRender.length === 0) {
-        logBody.innerHTML = `<div style="color: var(--text-muted); text-align: center; margin-top: 20px;">Tidak ada log yang cocok</div>`;
+        logBody.innerHTML = `<div style="color: var(--text-muted); text-align: center; margin-top: 24px;">Tidak ada log yang cocok</div>`;
         return;
       }
-      
+
       logBody.innerHTML = logsToRender.map(log => {
         const badgeText = log.type === 'info' ? 'info' : log.type === 'warn' ? 'warn' : 'err';
         return `
-          <div class="log-entry log-entry-${log.type}">
-            <span class="log-entry-time">[${log.timestamp}]</span>
+          <div class="log-entry log-entry-${escapeHtml(log.type)}">
+            <span class="log-entry-time">[${escapeHtml(log.timestamp)}]</span>
             <span class="log-entry-badge">${badgeText}</span>
             <span class="log-entry-msg">${escapeHtml(log.message)}</span>
           </div>
         `;
       }).join('');
-      
+
       if (document.getElementById('logAutoScroll').checked) {
         logBody.scrollTop = logBody.scrollHeight;
       }
     }
 
     function toggleLogPanel() {
+      if (userRole !== 'admin') return;
       const logPanel = document.getElementById('logPanel');
       const logBubbleBtn = document.getElementById('logBubbleBtn');
-      const badge = document.getElementById('logNotificationBadge');
-      
+      const mobileLogsBtn = document.getElementById('mobileNavLogsBtn');
+      const logBackdrop = document.getElementById('logSheetBackdrop');
+
       isPanelOpen = !isPanelOpen;
-      
+
       if (isPanelOpen) {
         logPanel.classList.add('active');
         logBubbleBtn.classList.add('active');
-        badge.style.display = 'none';
-        hasUnreadAlerts = false;
-        
+        if (mobileLogsBtn) mobileLogsBtn.classList.add('active');
+        if (window.innerWidth < 768) {
+          logBackdrop.classList.add('active');
+          window.BcaUI.setBodyScrollLock(true, 'logSheet');
+        }
+        setLogBadgeVisibility(false);
+
         fetchLogs();
         clearInterval(logPollInterval);
         logPollInterval = setInterval(fetchLogs, 3000);
       } else {
         logPanel.classList.remove('active');
         logBubbleBtn.classList.remove('active');
-        
+        if (mobileLogsBtn) mobileLogsBtn.classList.remove('active');
+        logBackdrop.classList.remove('active');
+        window.BcaUI.setBodyScrollLock(false, 'logSheet');
+
         clearInterval(logPollInterval);
         logPollInterval = setInterval(fetchLogs, 15000);
       }
@@ -1270,91 +2111,23 @@
       renderLogs();
     }
 
-    function escapeHtml(text) {
-      const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-      };
-      return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    // Initial Load with Hash Routing Support
+    const initialHash = (window.location.hash || '').replace('#', '');
+    if (initialHash && ['overview', 'merchants', 'transactions', 'users'].includes(initialHash) && !(initialHash === 'users' && userRole !== 'admin')) {
+      switchTab(initialHash, false, true);
+    } else {
+      loadTabChunks();
     }
-
-    // Initial Load
-    loadTabChunks();
-    
-    // Start background slow polling for logs
-    fetchLogs();
-    logPollInterval = setInterval(fetchLogs, 15000);
+    window.addEventListener('hashchange', () => {
+      const hash = (window.location.hash || '').replace('#', '');
+      if (hash && ['overview', 'merchants', 'transactions', 'users'].includes(hash) && !(hash === 'users' && userRole !== 'admin')) {
+        switchTab(hash, false);
+      }
+    });
+    if (userRole === 'admin') {
+      fetchLogs();
+      logPollInterval = setInterval(fetchLogs, 15000);
+    }
   </script>
-
-  <!-- Floating Log Bubble & Panel -->
-  <div class="log-widget-container">
-    <!-- Bubble Button -->
-    <button class="log-bubble-btn" id="logBubbleBtn" onclick="toggleLogPanel()" title="Tampilkan Log Aktivitas">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="4 17 10 11 4 5"></polyline>
-        <line x1="12" y1="19" x2="20" y2="19"></line>
-      </svg>
-      <div class="notification-badge" id="logNotificationBadge"></div>
-    </button>
-
-    <!-- Logs Panel -->
-    <div class="glass-panel log-panel" id="logPanel">
-      <!-- Panel Header -->
-      <div class="log-header">
-        <div class="log-header-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-color);">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-            <line x1="8" y1="21" x2="16" y2="21"></line>
-            <line x1="12" y1="17" x2="12" y2="21"></line>
-          </svg>
-          <span>Log Aktivitas Sistem</span>
-        </div>
-        <div class="log-live-indicator">
-          <div class="log-live-dot"></div>
-          <span>LIVE</span>
-        </div>
-        <div class="log-actions">
-          <button class="log-action-btn" onclick="clearLocalLogs()" title="Kosongkan Tampilan">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          </button>
-          <button class="log-action-btn" onclick="toggleLogPanel()" title="Tutup">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Panel Search -->
-      <div class="log-search-container">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted);">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <input type="text" class="log-search-input" id="logSearchInput" placeholder="Cari log..." oninput="filterLocalLogs()">
-      </div>
-
-      <!-- Panel Body (Console style) -->
-      <div class="log-body" id="logBody">
-        <div style="color: var(--text-muted); text-align: center; margin-top: 20px;">Menghubungkan ke logs stream...</div>
-      </div>
-
-      <!-- Panel Footer -->
-      <div class="log-footer">
-        <label class="log-footer-label">
-          <input type="checkbox" id="logAutoScroll" checked style="accent-color: var(--accent-color);">
-          <span>Auto Scroll</span>
-        </label>
-        <span id="logStatusText">Terakhir diperbarui: -</span>
-      </div>
-    </div>
-  </div>
 </body>
 </html>

@@ -1,5 +1,7 @@
 const database = require('../database');
 const bcaScraper = require('./bcaScraper');
+const qrisUtil = require('../utils/qris');
+const { updateDotEnvStaticQris } = require('../backend/config/env');
 
 /**
  * Dispatches a webhook notification to the merchant's endpoint.
@@ -73,6 +75,8 @@ async function markTransactionSuccess(txId, bcaRef = null) {
 
 // Map to track the last keep-alive check for each merchant (merchantId -> timestamp)
 const lastPollTimes = {};
+// Map to track one-time background static QRIS auto-fetch attempts (merchantId -> credential signature)
+const staticQrisSyncAttempted = {};
 let isChecking = false;
 
 /**
@@ -109,8 +113,30 @@ async function checkPendingTransactions() {
     const now = Date.now();
 
     for (const merchant of merchants) {
-      if (!merchant.bca_user || !merchant.bca_pass) {
+      const bcaUser = merchant.bca_user || process.env.BCA_USER;
+      const bcaPass = merchant.bca_pass || process.env.BCA_PASS;
+      if (!bcaUser || !bcaPass) {
         continue;
+      }
+
+      // Auto-fetch Static QRIS once in background if DB static_qris or .env STATIC_QRIS is empty
+      const credSig = `${bcaUser}:${bcaPass.length}`;
+      const needsDbQris = !merchant.static_qris || merchant.static_qris.trim() === '';
+      const needsEnvQris = !process.env.STATIC_QRIS || process.env.STATIC_QRIS.trim() === '';
+      if ((needsDbQris || needsEnvQris) && staticQrisSyncAttempted[merchant.id] !== credSig) {
+        staticQrisSyncAttempted[merchant.id] = credSig;
+        try {
+          console.log(`[Checker] Menjalankan auto-fetch QRIS Statis dari KlikBCA untuk merchant "${merchant.name}" (DB kosong: ${needsDbQris}, .env kosong: ${needsEnvQris})...`);
+          const fetchedQris = await bcaScraper.fetchStaticQris(bcaUser, bcaPass);
+          if (fetchedQris && qrisUtil.validateQRIS(fetchedQris)) {
+            await database.run('UPDATE merchants SET static_qris = ? WHERE id = ?', [fetchedQris, merchant.id]);
+            merchant.static_qris = fetchedQris;
+            updateDotEnvStaticQris(fetchedQris);
+            console.log(`[Checker] Static QRIS berhasil di-auto-fetch dari KlikBCA dan diperbarui ke DB & .env untuk merchant "${merchant.name}".`);
+          }
+        } catch (qrisErr) {
+          console.warn(`[Checker] Auto-fetch Static QRIS gagal untuk merchant "${merchant.name}":`, qrisErr.message);
+        }
       }
 
       const hasPending = pendingByMerchant[merchant.id] && pendingByMerchant[merchant.id].length > 0;
@@ -124,7 +150,7 @@ async function checkPendingTransactions() {
         lastPollTimes[merchant.id] = now;
         
         console.log(`[Checker] Polling merchant "${merchant.name}" (Pending: ${hasPending ? 'YA (10s)' : 'TIDAK (1m Keep-Alive)'})...`);
-        const bcaTransactions = await bcaScraper.fetchBcaTransactions(merchant.bca_user, merchant.bca_pass);
+        const bcaTransactions = await bcaScraper.fetchBcaTransactions(bcaUser, bcaPass);
         console.log(`[Checker] Scraped transactions count: ${bcaTransactions ? bcaTransactions.length : 0}. Data:`, JSON.stringify(bcaTransactions));
 
         if (hasPending && bcaTransactions && bcaTransactions.length > 0) {
@@ -165,6 +191,9 @@ function startChecker(intervalMs = 30000) {
   if (checkerInterval) return;
   
   console.log(`[Checker] Starting transaction status background checker (Interval: ${intervalMs}ms)...`);
+  setTimeout(() => {
+    checkPendingTransactions().catch(err => console.error('[Checker] Initial run error:', err));
+  }, 1500);
   checkerInterval = setInterval(checkPendingTransactions, intervalMs);
 }
 

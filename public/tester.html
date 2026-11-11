@@ -2,282 +2,387 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>API Integration Tester - BCA Payment Gateway</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#060a14">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2'%3E%3Cpath d='M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z'/%3E%3Cpath d='M9 12l2 2 4-4'/%3E%3C/svg%3E">
+  <title>API & Webhook Tester - BCA Payment Gateway</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
+    .tester-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 10px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(12, 19, 34, 0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .tester-brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      text-decoration: none;
+      color: #fff;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 14.5px;
+    }
+
+    .tester-nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tester-container {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 20px 20px 48px;
+    }
+
+    .tester-hero {
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .tester-hero h1 {
+      font-size: 20px;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
     .tester-grid {
       display: grid;
-      grid-template-columns: 1fr 1.2fr;
-      gap: 32px;
-      margin-top: 32px;
+      grid-template-columns: 1fr 1.15fr;
+      gap: 20px;
+      align-items: start;
     }
+
+    .input-with-btn {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .input-with-btn .form-control {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .webhook-log-card {
+      margin-top: 12px;
+      max-height: 460px;
+      overflow-y: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: #060a14;
+    }
+
+    .webhook-item {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 12.5px;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .webhook-item:last-child {
+      border-bottom: none;
+    }
+
+    .webhook-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      font-size: 11.5px;
+    }
+
+    .status-box {
+      background: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      margin-top: 12px;
+      transition: all 0.25s ease;
+    }
+
+    .status-box.is-success {
+      background: var(--success-bg);
+      border-color: var(--success-border);
+    }
+
     @media (max-width: 900px) {
       .tester-grid {
         grid-template-columns: 1fr;
       }
-      header {
-        flex-wrap: wrap;
-        gap: 16px;
+    }
+
+    @media (max-width: 767px) {
+      .tester-topbar {
+        padding: 10px 14px;
       }
-    }
-    .webhook-log-card {
-      margin-top: 24px;
-      max-height: 400px;
-      overflow-y: auto;
-    }
-    .webhook-item {
-      padding: 16px;
-      border-bottom: 1px solid var(--card-border);
-      font-size: 0.9rem;
-      animation: fadeIn 0.4s ease;
-    }
-    .webhook-item:last-child {
-      border-bottom: none;
-    }
-    .webhook-header {
-      display: flex;
-      justify-content: space-between;
-      color: var(--text-secondary);
-      margin-bottom: 8px;
-      font-size: 0.8rem;
+      .tester-container {
+        padding: 16px 12px 40px;
+      }
+      .tester-nav-actions {
+        width: 100%;
+      }
+      .tester-nav-actions .btn {
+        flex: 1;
+      }
+      .tester-panel {
+        padding: 14px !important;
+      }
+      .input-with-btn {
+        flex-direction: column;
+      }
+      .input-with-btn .btn {
+        width: 100%;
+      }
     }
   </style>
 </head>
 <body>
-  <div style="max-width: 1200px; margin: 0 auto; padding: 40px 24px;">
-    
-    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; border-bottom: 1px solid var(--card-border); padding-bottom: 24px;">
-      <div>
-        <h1 style="font-size: 2.2rem; background: linear-gradient(to right, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">API & Webhook Tester</h1>
-        <p style="color: var(--text-secondary); margin-top: 4px;">Uji coba integrasi toko online (API Charge & Webhook Callback) di server lokal Anda.</p>
+  <header class="tester-topbar">
+    <a href="/dashboard.html" class="tester-brand">
+      <div class="brand-icon-badge" style="width: 28px; height: 28px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
       </div>
-      <div>
-        <a href="/dashboard.html" class="btn btn-secondary">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-          Kembali ke Dashboard
-        </a>
-      </div>
-    </header>
+      <span>BCA Gateway</span>
+    </a>
+    <div class="tester-nav-actions">
+      <a href="/docs.html" class="btn btn-secondary btn-sm">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+        Dokumentasi API
+      </a>
+      <a href="/dashboard.html" class="btn btn-primary btn-sm">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        Dashboard
+      </a>
+    </div>
+  </header>
+
+  <div class="tester-container">
+    <div class="tester-hero">
+      <h1>API & Webhook Tester</h1>
+      <p style="color: var(--text-secondary); font-size: 13px;">Uji coba integrasi toko online (Charge API, BCA QRIS Dinamis & Webhook Callback) secara langsung.</p>
+    </div>
 
     <div class="tester-grid">
-      <!-- Kiri: Simulator Form & Invoice QRIS -->
-      <div style="display: flex; flex-direction: column; gap: 24px;">
-        <div class="glass-panel" style="padding: 24px;">
-          <h3 style="margin-bottom: 20px;">1. Pengaturan Request API</h3>
-          
-          <form id="testerForm">
-            <div class="form-group">
-              <label class="form-label" for="apiKey">Merchant API Key</label>
-              <input type="text" id="apiKey" class="form-control" placeholder="BCA-GW-XXXXXX" required style="font-family: monospace;">
-              <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 4px;">Salin API Key merchant Anda dari Dashboard Admin.</small>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label" for="externalId">ID Eksternal / Order ID</label>
-              <input type="text" id="externalId" class="form-control" placeholder="ORDER-12345" required>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label" for="paymentMethod">Metode Pembayaran</label>
-              <select id="paymentMethod" class="form-control">
-                <option value="qris">BCA QRIS</option>
-                <option value="crypto">Crypto (Coinbase Commerce)</option>
-              </select>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label" for="amount">Nominal Transaksi (Rupiah)</label>
-              <input type="number" id="amount" class="form-control" placeholder="10000" value="15000" required>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label" for="webhookUrl">Webhook Callback URL</label>
-              <input type="url" id="webhookUrl" class="form-control" required>
-              <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 4px;">URL tujuan notifikasi sukses pembayaran. Endpoint simulasi lokal diisi default.</small>
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-block">Buat Invoice Pembayaran</button>
-          </form>
-        </div>
-
-        <!-- QRIS/Crypto Output Panel (Tampil setelah submit) -->
-        <div id="qrisOutputPanel" class="glass-panel" style="padding: 24px; display: none; text-align: center;">
-          <h3 style="margin-bottom: 16px; text-align: left;">2. Tampilan Invoice Pembayaran</h3>
-          
-          <!-- QRIS Section -->
-          <div id="qrisSection">
-            <div class="qr-image-container" style="background: #fff; padding: 12px; border-radius: 8px; display: inline-block;">
-              <img id="dynamicQrImg" src="" alt="Dynamic QRIS" style="width: 250px; height: 250px;">
-            </div>
+      <!-- Kiri: Simulator Form & Invoice Display -->
+      <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+        <div class="glass-panel tester-panel" style="padding: 18px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+            <span class="badge badge-info">Step 1</span>
+            <h3>Pengaturan Request API</h3>
           </div>
 
-          <!-- Crypto Section -->
-          <div id="cryptoSection" style="display: none; padding: 20px 0;">
-            <div style="font-size: 3rem; color: #60a5fa; margin-bottom: 12px;">
-              <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M12 6v12M8 10h8M8 14h8"></path>
-              </svg>
-            </div>
-            <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 8px; font-weight: 500;">
-              Silakan transfer USDT sebesar:
-            </p>
-            <div style="font-size: 2.2rem; font-weight: 800; color: #10b981; margin-bottom: 16px; font-family: monospace;" id="cryptoUSDTAmount">
-              0.00 USDT
-            </div>
-
-            <!-- Selector Jaringan untuk QR -->
-            <div class="form-group" style="max-width: 420px; margin: 0 auto 16px auto; text-align: left;">
-              <label class="form-label" style="font-size: 0.8rem; display: block; margin-bottom: 4px; color: var(--text-secondary);">Jaringan USDT (Untuk Scan QR Otomatis):</label>
-              <select id="cryptoNetworkSelect" class="form-control" style="font-size: 0.85rem; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff;">
-                <option value="polygon">Polygon (USDT) - Sangat Direkomendasikan (Fee Murah)</option>
-                <option value="arbitrum">Arbitrum One (USDT) - Direkomendasikan (Fee Murah)</option>
-                <option value="ethereum">Ethereum ERC-20 (USDT) - (Fee Sangat Mahal)</option>
+          <form id="testerForm">
+            <!-- Optional quick-fill merchant selector when logged in -->
+            <div class="form-group" id="quickMerchantSelectWrap" style="display: none;">
+              <label class="form-label" for="merchantKeySelect">Pilih Merchant Terdaftar (Opsional)</label>
+              <select id="merchantKeySelect" class="form-control">
+                <option value="">-- Pilih untuk mengisi API Key otomatis --</option>
               </select>
             </div>
 
-            <!-- QR Code Alamat Wallet (Format EIP-681) -->
-            <div style="background: #fff; padding: 12px; border-radius: 8px; display: inline-block; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-              <img id="cryptoQrImg" src="" alt="Crypto Wallet Address QR" style="width: 200px; height: 200px; display: block;">
-              <small style="color: #64748b; font-size: 0.7rem; display: block; margin-top: 4px; font-weight: 500;">Scan QR untuk mengisi Alamat & Nominal otomatis</small>
+            <div class="form-group">
+              <label class="form-label" for="apiKey">Merchant API Key</label>
+              <input type="text" id="apiKey" class="form-control font-mono" placeholder="BCA-GW-XXXXXX" required>
+              <small style="color: var(--text-muted); font-size: 11.5px; display: block; margin-top: 4px;">Salin API Key merchant Anda dari halaman Dashboard &rarr; Akun BCA Merchant.</small>
             </div>
-            
-            <div class="form-group" style="max-width: 420px; margin: 0 auto 20px auto;">
-              <label class="form-label" style="font-size: 0.8rem; text-align: left; display: block; margin-bottom: 4px;">Alamat Dompet Penerima (USDT):</label>
-              <div style="display: flex; gap: 8px;">
-                <input type="text" id="cryptoWalletAddress" class="form-control" readonly style="font-family: monospace; font-size: 0.8rem; text-align: center; background: rgba(255,255,255,0.05); color: #fff;">
-                <button type="button" class="btn btn-secondary" id="copyWalletBtn" style="padding: 0 16px; font-size: 0.85rem;">Copy</button>
+
+            <div class="form-group">
+              <label class="form-label" for="externalId">ID Eksternal / Order ID</label>
+              <div class="input-with-btn">
+                <input type="text" id="externalId" class="form-control font-mono" placeholder="INV-123456" required>
+                <button type="button" class="btn btn-secondary" id="genOrderIdBtn" title="Buat Order ID acak">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                  Acak ID
+                </button>
               </div>
             </div>
 
-            <!-- Petunjuk Cara Bayar -->
-            <div style="text-align: left; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 16px; margin: 20px auto; max-width: 450px; font-size: 0.85rem; line-height: 1.5;">
-              <strong style="color: #60a5fa; display: block; margin-bottom: 8px;">Cara Pembayaran Crypto:</strong>
-              <ol style="margin: 0; padding-left: 20px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 6px;">
-                <li>Buka aplikasi dompet/exchange Anda (seperti <strong>Binance, Trust Wallet, MetaMask, Indodax, Tokocrypto</strong>, dll.).</li>
-                <li>Pilih menu <strong>Kirim / Penarikan (Send / Withdraw)</strong>, lalu pilih koin <strong>USDT</strong>.</li>
-                <li>Pilih jaringan transfer: <strong style="color: #60a5fa;" id="instructionNetworkName">Polygon (USDT)</strong>. Jaringan pengirim di wallet Anda WAJIB sama dengan jaringan tujuan.</li>
-                <li>Masukkan nominal transfer tepat sebesar: <strong style="color: #10b981;"><span id="instructionAmount">0.00</span> USDT</strong> agar transaksi terverifikasi otomatis.</li>
-                <li>Pembayaran Anda akan otomatis terkonfirmasi oleh sistem dalam 1-5 menit setelah dana terdeteksi masuk.</li>
-              </ol>
+            <div class="form-group">
+              <label class="form-label" for="amount">Nominal Transaksi (IDR)</label>
+              <input type="number" id="amount" class="form-control tabular-nums" placeholder="15000" value="15000" min="1" required>
+              <div class="preset-chips" aria-label="Preset Nominal">
+                <button type="button" class="preset-chip" data-amt="10000">Rp 10.000</button>
+                <button type="button" class="preset-chip" data-amt="25000">Rp 25.000</button>
+                <button type="button" class="preset-chip" data-amt="50000">Rp 50.000</button>
+                <button type="button" class="preset-chip" data-amt="100000">Rp 100.000</button>
+              </div>
             </div>
 
-            <a id="coinbasePayBtn" href="#" target="_blank" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; padding:12px 24px; font-weight:600; text-decoration:none; justify-content:center;">
-              <span>Cek Alamat di Etherscan Explorer</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-            </a>
+            <div class="form-group">
+              <label class="form-label" for="acquirerSelect">Routing Bank / Acquirer QRIS</label>
+              <select id="acquirerSelect" class="form-control">
+                <option value="bca">Hanya BCA (ID.CO.BCA.WWW) — Mutasi masuk ke KlikBCA</option>
+                <option value="dana">Hanya DANA (ID.DANA.WWW) — Mutasi masuk ke DANA</option>
+                <option value="multi">Semua Acquirer Asli (Multi-Bank)</option>
+              </select>
+              <small style="color: var(--text-muted); font-size: 11.5px; display: block; margin-top: 4px;">Pilih <strong>Hanya BCA</strong> agar pembayaran dari aplikasi apa pun wajib masuk ke KlikBCA sehingga auto-konfirmasi berjalan.</small>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="webhookUrl">Webhook Callback URL</label>
+              <input type="url" id="webhookUrl" class="form-control font-mono" required>
+              <small style="color: var(--text-muted); font-size: 11.5px; display: block; margin-top: 4px;">Endpoint simulasi lokal terisi otomatis.</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" id="createInvoiceBtn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              <span id="createInvoiceBtnText">Buat Invoice BCA QRIS</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Step 2: QRIS Output Panel -->
+        <div id="qrisOutputPanel" class="glass-panel tester-panel" style="padding: 18px; display: none; text-align: center;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="badge badge-success">Step 2</span>
+              <h3>Invoice Pembayaran QRIS</h3>
+            </div>
           </div>
 
-          <div style="font-size: 1.4rem; font-weight: 700; color: #fff; margin-top: 12px;" id="outputAmount">Rp 15.000</div>
-          <p style="color: var(--text-secondary); font-size: 0.85rem;" id="outputTxId">ID Transaksi: -</p>
-          
-          <div id="statusBox" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 12px; margin-top: 16px; transition: all 0.3s ease;">
-            <span id="statusText" style="color: var(--warning); font-weight: 600;">Status: PENDING</span>
-            <p id="countdownText" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">Menghubungkan ke KlikBCA...</p>
+          <div id="qrisSection">
+            <div class="qr-image-container">
+              <img id="dynamicQrImg" src="" alt="Dynamic QRIS" style="width: 200px; max-width: 100%; height: auto;">
+            </div>
+          </div>
+
+          <div style="font-size: 20px; font-weight: 700; color: #fff; margin-top: 8px;" class="tabular-nums" id="outputAmount">Rp 15.000</div>
+          <p class="font-mono" style="color: var(--text-secondary); font-size: 11.5px; margin-top: 4px; word-break: break-all;" id="outputTxId">ID Transaksi: -</p>
+          <div id="outputAcquirerBadge" style="margin-top: 6px;"></div>
+
+          <div id="statusBox" class="status-box">
+            <span id="statusText" style="color: var(--warning); font-weight: 700; font-size: 13px;">Status: PENDING</span>
+            <p id="countdownText" style="font-size: 12px; color: var(--text-secondary); margin-top: 3px;">Menghubungkan ke KlikBCA...</p>
           </div>
         </div>
       </div>
 
       <!-- Kanan: Real-time Webhook Logger Feed -->
-      <div>
-        <div class="glass-panel" style="padding: 24px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h3>3. Live Webhook Feed (Toko Online Anda)</h3>
-            <button class="btn btn-secondary btn-sm" onclick="clearLogs()">Hapus Log</button>
+      <div style="min-width: 0;">
+        <div class="glass-panel tester-panel" style="padding: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="badge badge-info">Step 3</span>
+              <h3>Live Webhook Feed</h3>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="clearLogs()">Hapus Log</button>
           </div>
-          <p style="color: var(--text-secondary); font-size: 0.85rem;">Server BCA Gateway akan memicu HTTP POST ke endpoint callback merchant saat pembayaran terkonfirmasi. Di bawah ini adalah log notifikasi masuk:</p>
-          
+          <p style="color: var(--text-secondary); font-size: 12.5px; line-height: 1.5;">
+            Server BCA Gateway akan mengirim HTTP POST callback ke URL webhook Anda saat transaksi BCA QRIS terverifikasi sukses:
+          </p>
+
           <div class="webhook-log-card" id="webhookLogFeed">
-            <div style="text-align: center; color: var(--text-muted); padding: 40px 0;" id="emptyLogMsg">
-              Belum ada log webhook yang diterima.
-              <br><small>Menunggu pembayaran sukses...</small>
+            <div class="empty-state" id="emptyLogMsg" style="padding: 32px 14px;">
+              <svg class="empty-state-icon" style="width: 34px; height: 34px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+              <div class="empty-state-title">Belum ada log webhook</div>
+              <div class="empty-state-desc" style="margin-bottom: 0;">Menunggu callback pembayaran sukses dari server...</div>
             </div>
           </div>
         </div>
       </div>
     </div>
-
   </div>
 
   <div class="toast-container" id="toastContainer"></div>
 
+  <script src="/js/ui-core.js"></script>
   <script>
-    // Set default Webhook URL based on server address
+    // Default Webhook URL & random Order ID
     document.getElementById('webhookUrl').value = window.location.origin + '/api/test-webhook';
-    
-    // Auto-generate random Order ID
-    document.getElementById('externalId').value = 'INV-' + Math.floor(100000 + Math.random() * 900000);
-
-    let currentCryptoData = null;
-
-    function updateCryptoPaymentView() {
-      if (!currentCryptoData) return;
-      
-      const network = document.getElementById('cryptoNetworkSelect').value;
-      const address = currentCryptoData.hosted_url;
-      const amountCrypto = currentCryptoData.amount_crypto;
-      
-      // USDT decimals = 6
-      const amountInAtomic = Math.round(amountCrypto * 1000000);
-      
-      let contractAddress = '';
-      let explorerUrl = '';
-      let networkNameDisplay = '';
-      
-      if (network === 'polygon') {
-        contractAddress = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F@137';
-        explorerUrl = `https://polygonscan.com/address/${address}`;
-        networkNameDisplay = 'Polygon (USDT)';
-      } else if (network === 'ethereum') {
-        contractAddress = '0xdAC17F958D2ee523a2206206994597C13D831ec7@1';
-        explorerUrl = `https://etherscan.io/address/${address}`;
-        networkNameDisplay = 'Ethereum ERC-20 (USDT)';
-      } else if (network === 'arbitrum') {
-        contractAddress = '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9@42161';
-        explorerUrl = `https://arbiscan.io/address/${address}`;
-        networkNameDisplay = 'Arbitrum One (USDT)';
-      }
-      
-      // EIP-681 URI format for ERC20 transfer
-      const qrData = `ethereum:${contractAddress}/transfer?address=${address}&uint256=${amountInAtomic}`;
-      
-      // Update QR Code image
-      document.getElementById('cryptoQrImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(qrData)}`;
-      
-      // Update explorer link
-      document.getElementById('coinbasePayBtn').href = explorerUrl;
-      document.getElementById('coinbasePayBtn').querySelector('span').innerText = `Cek Alamat di ${network === 'polygon' ? 'Polygonscan' : network === 'arbitrum' ? 'Arbiscan' : 'Etherscan'}`;
-      
-      // Update instruction details
-      document.getElementById('instructionNetworkName').innerText = networkNameDisplay;
+    function generateOrderId() {
+      return 'INV-' + Math.floor(100000 + Math.random() * 900000);
     }
+    document.getElementById('externalId').value = generateOrderId();
+    document.getElementById('genOrderIdBtn').addEventListener('click', () => {
+      document.getElementById('externalId').value = generateOrderId();
+    });
 
-    // Attach select change listener
-    document.getElementById('cryptoNetworkSelect').addEventListener('change', updateCryptoPaymentView);
+    // Preset nominal chips
+    const amountInput = document.getElementById('amount');
+    const presetChips = document.querySelectorAll('.preset-chip');
+    presetChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        const val = chip.getAttribute('data-amt');
+        amountInput.value = val;
+        presetChips.forEach(c => c.classList.toggle('active', c === chip));
+      });
+    });
+    amountInput.addEventListener('input', () => {
+      const val = amountInput.value;
+      presetChips.forEach(c => c.classList.toggle('active', c.getAttribute('data-amt') === val));
+    });
 
-    const toastContainer = document.getElementById('toastContainer');
-    function showToast(message, type = 'success') {
-      const toast = document.createElement('div');
-      toast.className = `toast toast-${type}`;
-      toast.innerHTML = `<div style="font-weight: 500;">${message}</div>`;
-      toastContainer.appendChild(toast);
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
-    }
+    // Load merchant keys if logged in as admin
+    (async function preloadMerchantKeys() {
+      const token = localStorage.getItem('gateway_token');
+      const role = localStorage.getItem('user_role');
+      if (!token || role !== 'admin') return;
+      try {
+        const res = await fetch('/api/merchants', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.ok) {
+          const merchants = await res.json();
+          const validMerchants = merchants.filter(m => m.api_key && !m.api_key.includes('••••'));
+          if (validMerchants.length > 0) {
+            const wrap = document.getElementById('quickMerchantSelectWrap');
+            const select = document.getElementById('merchantKeySelect');
+            validMerchants.forEach(m => {
+              const opt = document.createElement('option');
+              opt.value = m.api_key;
+              opt.textContent = `${m.name} (${m.api_key.slice(0, 14)}...)`;
+              select.appendChild(opt);
+            });
+            wrap.style.display = 'block';
+            select.addEventListener('change', () => {
+              if (select.value) {
+                document.getElementById('apiKey').value = select.value;
+                showToast('API Key merchant diisi otomatis');
+              }
+            });
+          }
+        }
+      } catch (e) {}
+    })();
 
-    // Submit request to Charge API
+    const showToast = (msg, type = 'success') => window.BcaUI.showToast(msg, type);
+    const escapeHtml = (text) => window.BcaUI.escapeHtml(text);
+
+    // Submit Charge API
     document.getElementById('testerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      
-      const apiKey = document.getElementById('apiKey').value;
-      const external_id = document.getElementById('externalId').value;
-      const payment_method = document.getElementById('paymentMethod').value;
+
+      const apiKey = document.getElementById('apiKey').value.trim();
+      const external_id = document.getElementById('externalId').value.trim();
       const amount = document.getElementById('amount').value;
-      const webhook_url = document.getElementById('webhookUrl').value;
+      const acquirer = document.getElementById('acquirerSelect').value;
+      const webhook_url = document.getElementById('webhookUrl').value.trim();
+
+      const btn = document.getElementById('createInvoiceBtn');
+      const btnText = document.getElementById('createInvoiceBtnText');
+      btn.disabled = true;
+      btnText.innerText = 'Membuat Invoice...';
 
       try {
         const response = await fetch('/api/v1/charge', {
@@ -286,80 +391,51 @@
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ external_id, amount, webhook_url, payment_method })
+          body: JSON.stringify({ external_id, amount, acquirer, webhook_url })
         });
 
         const data = await response.json();
 
         if (response.ok) {
-          showToast(payment_method === 'crypto' ? 'Invoice Coinbase Crypto berhasil dibuat!' : 'Invoice Dynamic QRIS berhasil dibuat!');
-          
-          if (payment_method === 'crypto') {
-            document.getElementById('qrisSection').style.display = 'none';
-            document.getElementById('cryptoSection').style.display = 'block';
-            
-            // Set USDT amount and wallet address fields
-            document.getElementById('cryptoUSDTAmount').innerText = `${data.amount_crypto} USDT`;
-            document.getElementById('cryptoWalletAddress').value = data.hosted_url;
-            document.getElementById('instructionAmount').innerText = data.amount_crypto;
-
-            // Save data and trigger view update
-            currentCryptoData = data;
-            updateCryptoPaymentView();
-            
-            document.getElementById('countdownText').innerText = 'Menunggu pembayaran crypto terdeteksi...';
-          } else {
-            document.getElementById('qrisSection').style.display = 'block';
-            document.getElementById('cryptoSection').style.display = 'none';
-            document.getElementById('dynamicQrImg').src = data.qris_image;
-            document.getElementById('countdownText').innerText = 'Menghubungkan ke KlikBCA...';
-          }
+          showToast('Invoice Dynamic QRIS berhasil dibuat!');
+          document.getElementById('dynamicQrImg').src = data.qris_image;
+          document.getElementById('countdownText').innerText = 'Menghubungkan ke KlikBCA...';
 
           document.getElementById('outputAmount').innerText = 'Rp ' + data.amount.toLocaleString('id-ID');
           document.getElementById('outputTxId').innerText = `ID Eksternal: ${data.external_id} | ID Transaksi: #${data.transaction_id}`;
+          const acqList = Array.isArray(data.active_acquirers) ? data.active_acquirers.join(' + ') : (data.qris_acquirer || 'BCA');
+          document.getElementById('outputAcquirerBadge').innerHTML = `<span class="badge badge-info" style="font-size:10.5px;">Routing Acquirer: ${escapeHtml(acqList)}</span>`;
           document.getElementById('qrisOutputPanel').style.display = 'block';
-          
-          // Reset countdown timer
-          startStatusCountdown(data.transaction_id, apiKey, payment_method);
+          document.getElementById('qrisOutputPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+          startStatusCountdown(data.transaction_id, apiKey);
         } else {
           showToast(data.message || 'API Key salah atau payload tidak valid', 'error');
         }
       } catch (err) {
         showToast('Gagal memanggil API Charge', 'error');
+      } finally {
+        btn.disabled = false;
+        btnText.innerText = 'Buat Invoice BCA QRIS';
       }
     });
 
-    // Copy wallet button event listener
-    document.getElementById('copyWalletBtn').addEventListener('click', () => {
-      const addressInput = document.getElementById('cryptoWalletAddress');
-      addressInput.select();
-      addressInput.setSelectionRange(0, 99999); // For mobile devices
-      navigator.clipboard.writeText(addressInput.value);
-      showToast('Alamat wallet berhasil disalin!');
-    });
-
     let countdownTimer = null;
-    function startStatusCountdown(txId, apiKey, paymentMethod) {
+    function startStatusCountdown(txId, apiKey) {
       if (countdownTimer) clearInterval(countdownTimer);
-      
+
       const statusBox = document.getElementById('statusBox');
       const statusText = document.getElementById('statusText');
       const countdownText = document.getElementById('countdownText');
-      
-      statusBox.style.background = 'rgba(245, 158, 11, 0.1)';
-      statusBox.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+
+      statusBox.classList.remove('is-success');
       statusText.innerText = 'Status: PENDING';
       statusText.style.color = 'var(--warning)';
 
-      const isCrypto = paymentMethod === 'crypto';
-      let countdown = isCrypto ? 5 : 15; // Poll faster for crypto
-      
+      let countdown = 15;
+
       const updateText = () => {
-        if (isCrypto) {
-          countdownText.innerText = `Mengecek status Coinbase dalam ${countdown} detik...`;
-        } else {
-          countdownText.innerText = `Menghubungkan ke KlikBCA dalam ${countdown} detik...`;
-        }
+        countdownText.innerText = `Menghubungkan ke KlikBCA dalam ${countdown} detik...`;
       };
 
       updateText();
@@ -367,29 +443,26 @@
       countdownTimer = setInterval(async () => {
         countdown--;
         if (countdown <= 0) {
-          countdownText.innerText = isCrypto ? 'Sedang mengecek Coinbase Commerce...' : 'Sedang mengecek KlikBCA...';
-          
+          countdownText.innerText = 'Sedang mengecek mutasi KlikBCA...';
           try {
-            const response = await fetch(`/api/v1/status/${document.getElementById('externalId').value}`, {
+            const response = await fetch(`/api/v1/status/${encodeURIComponent(document.getElementById('externalId').value)}`, {
               headers: { 'Authorization': `Bearer ${apiKey}` }
             });
             const statusData = await response.json();
-            
+
             if (statusData.status === 'success') {
               clearInterval(countdownTimer);
-              statusBox.style.background = 'rgba(16, 185, 129, 0.1)';
-              statusBox.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+              statusBox.classList.add('is-success');
               statusText.innerText = 'Status: SUKSES (TERBAYAR)';
               statusText.style.color = 'var(--success)';
-              countdownText.innerText = isCrypto ? 'Pembayaran crypto terkonfirmasi otomatis via Coinbase!' : 'Pembayaran terkonfirmasi otomatis!';
+              countdownText.innerText = 'Pembayaran QRIS terkonfirmasi otomatis!';
               showToast('Pembayaran Sukses!');
               return;
             }
-          } catch(e) {
+          } catch (e) {
             console.error('Error checking status:', e);
           }
-          
-          countdown = isCrypto ? 5 : 15; // Reset loop
+          countdown = 15;
           updateText();
         } else {
           updateText();
@@ -416,39 +489,37 @@
 
     function renderWebhookLogs(logs) {
       const feed = document.getElementById('webhookLogFeed');
-      const emptyMsg = document.getElementById('emptyLogMsg');
-      
       if (logs.length === 0) {
         feed.innerHTML = `
-          <div style="text-align: center; color: var(--text-muted); padding: 40px 0;" id="emptyLogMsg">
-            Belum ada log webhook yang diterima.
-            <br><small>Menunggu pembayaran sukses...</small>
+          <div class="empty-state" id="emptyLogMsg" style="padding: 32px 14px;">
+            <svg class="empty-state-icon" style="width: 34px; height: 34px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            <div class="empty-state-title">Belum ada log webhook</div>
+            <div class="empty-state-desc" style="margin-bottom: 0;">Menunggu callback pembayaran sukses dari server...</div>
           </div>
         `;
         return;
       }
 
-      if (emptyMsg) emptyMsg.remove();
-      
-      // Clear all items except the template
       feed.innerHTML = '';
-
       logs.forEach(log => {
         const item = document.createElement('div');
         item.className = 'webhook-item';
         const dateStr = new Date(log.timestamp).toLocaleTimeString('id-ID');
-        
+
         item.innerHTML = `
           <div class="webhook-header">
-            <span style="color: var(--success); font-weight: 600;">[POST] SUCCESS CALLBACK</span>
-            <span>${dateStr}</span>
+            <span class="badge badge-success"><span class="badge-dot"></span>[POST] SUCCESS CALLBACK</span>
+            <span class="font-mono">${escapeHtml(dateStr)}</span>
           </div>
-          <div style="margin-top: 8px;">
-            <strong>URL:</strong> <span style="font-family: monospace; font-size: 0.8rem; color: var(--text-secondary);">${log.body.webhook_url || '/api/test-webhook'}</span>
+          <div style="margin-top: 6px; word-break: break-all;">
+            <strong style="color: var(--text-secondary);">URL:</strong>
+            <span class="font-mono" style="font-size: 11.5px; color: var(--bca-cyan);">${escapeHtml((log.body && log.body.webhook_url) || '/api/test-webhook')}</span>
           </div>
-          <div style="margin-top: 8px;">
-            <strong>Payload Body:</strong>
-            <pre class="qr-payload-box" style="margin-top: 4px; max-height: 180px; text-align: left; padding: 10px; background: rgba(0,0,0,0.4); font-size: 0.8rem;">${JSON.stringify(log.body, null, 2)}</pre>
+          <div style="margin-top: 6px;">
+            <strong style="color: var(--text-secondary);">Payload Body:</strong>
+            <pre class="qr-payload-box" style="margin-top: 4px; margin-bottom: 0; max-height: 180px; white-space: pre; overflow-x: auto;">${escapeHtml(JSON.stringify(log.body, null, 2))}</pre>
           </div>
         `;
         feed.appendChild(item);
@@ -461,7 +532,6 @@
       showToast('Log dibersihkan.');
     }
 
-    // Poll logs every 2 seconds
     setInterval(pollWebhookLogs, 2000);
   </script>
 </body>

@@ -1,8 +1,14 @@
 node_modules/
 *.db
+*.db-*
+*.sqlite*
 gateway.db
 public/*.png
 .env
+.env.*
+!.env.example
+*.log
+*.bak
 .DS_Store
 .idea/
 .vscode/

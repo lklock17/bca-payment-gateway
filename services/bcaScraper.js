@@ -1,9 +1,37 @@
-let puppeteer;
-try {
-  puppeteer = require('puppeteer');
-} catch (e) {
-  console.warn('[Scraper] Puppeteer is not installed. Automated BCA checks will run in simulation mode. Run "npm install puppeteer" in your workspace to enable.');
+let puppeteer = null;
+let puppeteerLoadError = null;
+
+async function getPuppeteer() {
+  if (puppeteer) return puppeteer;
+  try {
+    puppeteer = require('puppeteer');
+    return puppeteer;
+  } catch (e) {
+    if (e && e.code === 'ERR_REQUIRE_ESM') {
+      try {
+        const mod = await import('puppeteer');
+        puppeteer = mod.default || mod;
+        return puppeteer;
+      } catch (esmErr) {
+        puppeteerLoadError = esmErr;
+        console.warn('[Scraper] Failed to load Puppeteer via dynamic import:', esmErr.message);
+        return null;
+      }
+    }
+    puppeteerLoadError = e;
+    console.warn('[Scraper] Puppeteer is not installed. Automated BCA checks will run in simulation mode. Run "npm install puppeteer" in your workspace to enable.');
+    return null;
+  }
 }
+
+let jsQR = null;
+try {
+  jsQR = require('jsqr');
+} catch (e) {
+  console.warn('[Scraper] jsQR is not installed. Auto-fetch QRIS decoding requires "jsqr".');
+}
+
+const qrisUtil = require('../utils/qris');
 
 /**
  * Class to manage a persistent browser session for a BCA Merchant account.
@@ -22,9 +50,10 @@ class BcaSession {
   }
 
   async launch() {
-    if (!puppeteer) return;
+    const pup = await getPuppeteer();
+    if (!pup) return;
     console.log(`[Scraper] Launching new persistent browser for ${this.email}...`);
-    this.browser = await puppeteer.launch({
+    this.browser = await pup.launch({
       headless: true,
       args: [
         '--no-sandbox',
@@ -205,7 +234,7 @@ class BcaSession {
 
     // 3. Wait up to 10 seconds for the dashboard day/highlight buttons to load if not already visible
     try {
-      await this.page.waitForSelector('.weekdays button, button.highlight', { timeout: 10000 });
+      await this.page.waitForSelector('button.btn-datepicker, .weekdays button, button.highlight', { timeout: 10000 });
     } catch (err) {
       console.warn('[Scraper] Dashboard day buttons did not load within 10s. Forcing page refresh...');
       // If the page is stuck, try a quick reload to recover
@@ -218,11 +247,11 @@ class BcaSession {
     // 5. Refresh transaction list by clicking the active day button to query new data
     console.log('[Scraper] Refreshing transaction table...');
     await this.page.evaluate(() => {
-      const highlightBtn = document.querySelector('.weekdays button.highlight, button.highlight');
+      const highlightBtn = document.querySelector('button.btn-datepicker.highlight, .weekdays button.highlight, button.highlight');
       if (highlightBtn) {
         highlightBtn.click();
       } else {
-        const dayButtons = document.querySelectorAll('.weekdays button');
+        const dayButtons = document.querySelectorAll('button.btn-datepicker, .weekdays button');
         if (dayButtons.length > 0) {
           dayButtons[dayButtons.length - 1].click(); // Click last button (Today)
         }
@@ -236,20 +265,185 @@ class BcaSession {
       await this.page.screenshot({ path: 'public/screenshot-3-final.png' });
     } catch(e) {}
 
-    // 5. Extract table rows
+    // 5. Extract transaction rows (Modern Angular .transaction-details + fallback table layout)
     const transactions = await this.page.evaluate(() => {
       const result = [];
-      const rows = document.querySelectorAll('table tr, tr.table-active, tbody tr');
-      rows.forEach(row => {
-        const cells = row.querySelectorAll('td');
-        if (cells.length >= 2) {
-          result.push([cells[0].textContent.trim(), cells[1].textContent.trim()]);
-        }
-      });
+      const detailCards = document.querySelectorAll('.transaction-container .transaction-details, .transaction-details');
+      if (detailCards.length > 0) {
+        detailCards.forEach(card => {
+          const leftEl = card.querySelector('.left');
+          const rightEl = card.querySelector('.right');
+          if (leftEl && rightEl) {
+            result.push([
+              leftEl.textContent.replace(/\s+/g, ' ').trim(),
+              rightEl.textContent.replace(/\s+/g, ' ').trim()
+            ]);
+          }
+        });
+      }
+      if (result.length === 0) {
+        const rows = document.querySelectorAll('table tr, tr.table-active, tbody tr');
+        rows.forEach(row => {
+          const cells = row.querySelectorAll('td');
+          if (cells.length >= 2) {
+            result.push([cells[0].textContent.trim(), cells[1].textContent.trim()]);
+          }
+        });
+      }
       return result;
     });
 
     return transactions;
+  }
+
+  async extractStaticQris() {
+    if (!jsQR) {
+      throw new Error('Package jsqr belum terpasang di server.');
+    }
+    if (!this.page) {
+      throw new Error('Halaman browser belum diinisialisasi.');
+    }
+
+    // 1. Check current URL and page content to determine session state
+    const sessionCheck = await this.page.evaluate(() => {
+      if (document.querySelector('input[type="email"], input[type="password"], input[formcontrolname="username"], input[name="username"]')) {
+        return 'login_page';
+      }
+      const bodyText = document.body.innerText.toLowerCase();
+      if (
+        bodyText.includes('sesi anda telah berakhir') ||
+        bodyText.includes('sesi anda telah habis') ||
+        bodyText.includes('session has expired') ||
+        bodyText.includes('silakan login') ||
+        bodyText.includes('silahkan login') ||
+        bodyText.includes('session timeout') ||
+        bodyText.includes('sesi berakhir') ||
+        bodyText.includes('koneksi ke qr merchant service bca terputus')
+      ) {
+        return 'expired';
+      }
+      return 'active';
+    });
+
+    if (!this.isLoggedIn || sessionCheck === 'login_page' || sessionCheck === 'expired') {
+      console.log(`[Scraper] Session inactive during QRIS fetch (${sessionCheck}). Re-authenticating...`);
+      this.isLoggedIn = false;
+      await this.page.goto('https://qr.klikbca.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await this.login();
+    }
+
+    // 2. Navigate to /show-qr (prefer clicking a[href="/show-qr"] if present, fallback to direct goto)
+    console.log('[Scraper] Navigating to https://qr.klikbca.com/show-qr ...');
+    const clickedLink = await this.page.evaluate(() => {
+      const link = document.querySelector('a[href="/show-qr"], a[href*="/show-qr"]');
+      if (link) {
+        link.click();
+        return true;
+      }
+      return false;
+    }).catch(() => false);
+
+    if (clickedLink) {
+      try {
+        await this.page.waitForSelector('img.image-qr', { timeout: 8000 });
+      } catch (e) {
+        await this.page.goto('https://qr.klikbca.com/show-qr', { waitUntil: 'networkidle2', timeout: 30000 });
+      }
+    } else {
+      await this.page.goto('https://qr.klikbca.com/show-qr', { waitUntil: 'networkidle2', timeout: 30000 });
+    }
+
+    // 3. Wait for img.image-qr and ensure image has finished loading
+    await this.page.waitForSelector('img.image-qr', { timeout: 15000 });
+    await this.page.waitForFunction(() => {
+      const img = document.querySelector('img.image-qr');
+      return Boolean(img && img.complete && img.naturalWidth > 0 && img.src);
+    }, { timeout: 15000 });
+
+    // 4. Extract canvas pixels from img.image-qr
+    let pixelData = null;
+    try {
+      pixelData = await this.page.evaluate(() => {
+        const img = document.querySelector('img.image-qr');
+        if (!img) return null;
+        const w = img.naturalWidth || img.width || 400;
+        const h = img.naturalHeight || img.height || 400;
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        const imgData = ctx.getImageData(0, 0, w, h);
+        return {
+          width: w,
+          height: h,
+          data: Array.from(imgData.data)
+        };
+      });
+    } catch (canvasErr) {
+      console.warn('[Scraper] Direct canvas getImageData failed, falling back to element screenshot:', canvasErr.message);
+    }
+
+    let decoded = null;
+    if (pixelData && pixelData.data && pixelData.data.length > 0) {
+      const rgba = new Uint8ClampedArray(pixelData.data);
+      decoded = jsQR(rgba, pixelData.width, pixelData.height, {
+        inversionAttempts: 'attemptBoth'
+      });
+    }
+
+    // Fallback: screenshot the QR image element and decode via clean data URL canvas
+    if (!decoded || !decoded.data) {
+      const imgEl = await this.page.$('img.image-qr');
+      if (imgEl) {
+        const b64 = await imgEl.screenshot({ encoding: 'base64' });
+        const fallbackPixels = await this.page.evaluate(async (base64Png) => {
+          return await new Promise((resolve, reject) => {
+            const tempImg = new Image();
+            tempImg.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = tempImg.width;
+              canvas.height = tempImg.height;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#FFFFFF';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(tempImg, 0, 0);
+              const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              resolve({
+                width: canvas.width,
+                height: canvas.height,
+                data: Array.from(imgData.data)
+              });
+            };
+            tempImg.onerror = () => reject(new Error('Gagal memuat screenshot QR ke canvas'));
+            tempImg.src = `data:image/png;base64,${base64Png}`;
+          });
+        }, b64);
+
+        if (fallbackPixels && fallbackPixels.data && fallbackPixels.data.length > 0) {
+          const rgba = new Uint8ClampedArray(fallbackPixels.data);
+          decoded = jsQR(rgba, fallbackPixels.width, fallbackPixels.height, {
+            inversionAttempts: 'attemptBoth'
+          });
+        }
+      }
+    }
+
+    // Navigate back to main dashboard so background polling stays on mutasi view
+    await this.page.goto('https://qr.klikbca.com/home', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
+
+    if (!decoded || !decoded.data) {
+      throw new Error('Gagal men-decode string QRIS dari elemen img.image-qr.');
+    }
+
+    const qrisString = decoded.data.trim();
+    if (!qrisUtil.validateQRIS(qrisString)) {
+      throw new Error('String QRIS hasil decode gagal validasi checksum EMVCo CRC16.');
+    }
+    console.log(`[Scraper] Static QRIS decoded & validated successfully (length: ${qrisString.length}).`);
+    return qrisString;
   }
 
   async close() {
@@ -267,7 +461,8 @@ class BcaSession {
 const activeSessions = {};
 
 async function fetchBcaTransactions(email, password) {
-  if (!puppeteer) return [];
+  const pup = await getPuppeteer();
+  if (!pup) return [];
 
   let session = activeSessions[email];
   if (!session) {
@@ -319,12 +514,12 @@ async function fetchBcaTransactions(email, password) {
       const isCredit = col2.includes('+');
 
       if (isCredit) {
-        // Parse RRN reference (allowing alphanumeric RRNs)
-        const rrnMatch = col1.match(/RRN:\s*([a-zA-Z0-9]+)/i);
+        // Parse RRN reference (supports "RRN: 123" and "RRN : 123")
+        const rrnMatch = col1.match(/RRN\s*:\s*([a-zA-Z0-9]+)/i);
         const rrn = rrnMatch ? rrnMatch[1] : null;
 
-        // Parse exact time (e.g. 22.38 WIB) in Jakarta timezone (UTC+7)
-        const timeMatch = col1.match(/(\d{2})[\.:](\d{2})\s*WIB/i);
+        // Parse exact time (supports "12:43:24 WIB" and "22.38 WIB") in Jakarta timezone (UTC+7)
+        const timeMatch = col1.match(/(\d{2})[\.:](\d{2})(?:[\.:](\d{2}))?\s*WIB/i);
         let txDate = new Date();
         if (timeMatch) {
           try {
@@ -332,21 +527,25 @@ async function fetchBcaTransactions(email, password) {
             const jktString = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
             const jktDate = new Date(jktString);
             
-            // Set hours and minutes based on parsed WIB time
-            jktDate.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+            const hNum = parseInt(timeMatch[1], 10);
+            const mNum = parseInt(timeMatch[2], 10);
+            const sNum = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+            // Set hours, minutes, seconds based on parsed WIB time
+            jktDate.setHours(hNum, mNum, sNum, 0);
             
             const year = jktDate.getFullYear();
             const month = String(jktDate.getMonth() + 1).padStart(2, '0');
             const day = String(jktDate.getDate()).padStart(2, '0');
             const hours = String(jktDate.getHours()).padStart(2, '0');
             const minutes = String(jktDate.getMinutes()).padStart(2, '0');
+            const seconds = String(jktDate.getSeconds()).padStart(2, '0');
             
             // Construct UTC date correctly using the '+07:00' WIB offset
-            txDate = new Date(`${year}-${month}-${day}T${hours}:${minutes}:00+07:00`);
+            txDate = new Date(`${year}-${month}-${day}T${hours}:${minutes}:${seconds}+07:00`);
           } catch (e) {
             console.warn('[Scraper] Error parsing WIB time:', e.message);
             // Fallback to local time set
-            txDate.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+            txDate.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), timeMatch[3] ? parseInt(timeMatch[3], 10) : 0, 0);
           }
         }
 
@@ -394,6 +593,77 @@ async function fetchBcaTransactions(email, password) {
   }
 }
 
+async function fetchStaticQris(email, password) {
+  const pup = await getPuppeteer();
+  if (!pup) {
+    throw new Error('Puppeteer tidak tersedia di server untuk auto-fetch QRIS.');
+  }
+  if (!jsQR) {
+    throw new Error('Package jsqr tidak tersedia di server untuk decode QRIS.');
+  }
+
+  let session = activeSessions[email];
+  if (!session) {
+    session = new BcaSession(email, password);
+    activeSessions[email] = session;
+  } else if (session.password !== password) {
+    console.log(`[Scraper] Credentials updated for ${email}. Resetting session status...`);
+    session.password = password;
+    session.consecutiveFailedLogins = 0;
+    session.lastLoginAttemptTime = 0;
+    session.isLoggedIn = false;
+  }
+
+  // Wait if background polling is currently using this session (up to 25s)
+  let waitAttempts = 0;
+  while (session.isProcessing && waitAttempts < 50) {
+    await new Promise((r) => setTimeout(r, 500));
+    waitAttempts++;
+  }
+  if (session.isProcessing) {
+    throw new Error('Sesi scraper sedang sibuk memproses pengecekan transaksi. Coba lagi sebentar lagi.');
+  }
+
+  session.isProcessing = true;
+  try {
+    if (!session.browser) {
+      await session.launch();
+      await session.login();
+    } else if (!session.isLoggedIn) {
+      await session.login();
+    }
+
+    const qrisString = await session.extractStaticQris();
+    return qrisString;
+  } catch (err) {
+    console.error(`[Scraper] Static QRIS fetch error for ${email}:`, err.message);
+    if (session) {
+      session.lastLoginError = err.message;
+    }
+    const isBrowserAlive =
+      session.browser && typeof session.browser.connected === 'boolean'
+        ? session.browser.connected
+        : false;
+
+    if (isBrowserAlive) {
+      session.isLoggedIn = false;
+      try {
+        if (session.page) {
+          await session.page.goto('https://qr.klikbca.com/', { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+        }
+      } catch (e) {}
+    } else {
+      await session.close();
+      delete activeSessions[email];
+    }
+    throw err;
+  } finally {
+    if (session) {
+      session.isProcessing = false;
+    }
+  }
+}
+
 async function closeSession(email) {
   const session = activeSessions[email];
   if (session) {
@@ -426,7 +696,9 @@ function getSessionStatus(email) {
 }
 
 module.exports = {
+  BcaSession,
   fetchBcaTransactions,
+  fetchStaticQris,
   closeSession,
   closeAllSessions,
   getSessionStatus
