@@ -25,8 +25,13 @@ const {
   requireAdmin,
   createUserMgmtWritableMiddleware
 } = require('./backend/middlewares/rbac');
+const {
+  validateWebhookUrl,
+  createRateLimiter
+} = require('./backend/utils/security');
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = envConfig.port;
 
 // Global Log Buffer for Admin Dashboard Console Widget
@@ -68,6 +73,9 @@ console.error = (...args) => {
 };
 
 // Fallback runtime JWT secret if not configured in .env
+if (envConfig.node_env === 'production' && (!envConfig.jwt_secret || envConfig.jwt_secret.length < 32)) {
+  console.warn('[Security] PERINGATAN: JWT_SECRET belum diset atau terlalu pendek (<32 karakter) pada NODE_ENV=production.');
+}
 const runtimeJwtSecret =
   envConfig.jwt_secret || crypto.randomBytes(32).toString('hex');
 
@@ -79,10 +87,45 @@ const { generateToken, authenticateToken } = createAuthHelpers({
 
 const requireUserMgmtWritable = createUserMgmtWritableMiddleware(() => getEnvConfig());
 
-// Express Middleware
-app.use(cors());
+// Rate limiters
+const loginRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxAttempts: 10,
+  keyFn: (req) => {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    return `login:${ip}:${email}`;
+  },
+  message: 'Terlalu banyak percobaan login gagal. Silakan tunggu 15 menit sebelum mencoba lagi.'
+});
+
+const chargeRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxAttempts: 120,
+  keyFn: (req) => {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+    return `charge:${ip}`;
+  },
+  message: 'Rate limit terlampaui untuk pembuatan invoice. Silakan coba lagi sebentar lagi.'
+});
+
+// Express Security & Parsing Middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-XSS-Protection', '0');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  next();
+});
+const allowedOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+app.use(cors(allowedOrigins.length > 0 ? { origin: allowedOrigins, credentials: true } : {}));
 app.use(
   express.json({
+    limit: '100kb',
     verify: (req, res, buf) => {
       req.rawBody = buf;
     }
@@ -111,10 +154,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ==========================================
 // 1. AUTHENTICATION ROUTES
 // ==========================================
-app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
+app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
+  const { email, password } = req.body || {};
+  if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
     return res.status(400).json({ message: 'Email dan password harus diisi' });
+  }
+  if (email.length > 254 || password.length > 128) {
+    return res.status(400).json({ message: 'Email atau password melebihi batas panjang yang diizinkan' });
   }
 
   try {
@@ -130,6 +176,10 @@ app.post('/api/auth/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Email atau password salah' });
+    }
+
+    if (typeof req._rateLimitResetKey === 'function') {
+      req._rateLimitResetKey();
     }
 
     const tokenData = generateToken(user);
@@ -228,12 +278,18 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 app.post('/api/users', authenticateToken, requireAdmin, requireUserMgmtWritable, async (req, res) => {
-  const { email, password, role } = req.body;
-  if (!email || !password) {
+  const { email, password, role } = req.body || {};
+  if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
     return res.status(400).json({ message: 'Email dan password harus diisi' });
   }
 
   const cleanEmail = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) || cleanEmail.length > 254) {
+    return res.status(400).json({ message: 'Format email tidak valid' });
+  }
+  if (password.length < 6 || password.length > 128) {
+    return res.status(400).json({ message: 'Password harus antara 6 hingga 128 karakter' });
+  }
   const targetRole = role === 'admin' ? 'admin' : 'user';
 
   try {
@@ -260,13 +316,21 @@ app.post('/api/users', authenticateToken, requireAdmin, requireUserMgmtWritable,
 
 app.put('/api/users/:id', authenticateToken, requireAdmin, requireUserMgmtWritable, async (req, res) => {
   const { id } = req.params;
-  const { email, password, role, is_active } = req.body;
+  const { email, password, role, is_active } = req.body || {};
 
-  if (!email) {
+  if (typeof email !== 'string' || !email.trim()) {
     return res.status(400).json({ message: 'Email harus diisi' });
   }
 
   const cleanEmail = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) || cleanEmail.length > 254) {
+    return res.status(400).json({ message: 'Format email tidak valid' });
+  }
+  if (password !== undefined && password !== null && password !== '') {
+    if (typeof password !== 'string' || password.length < 6 || password.length > 128) {
+      return res.status(400).json({ message: 'Password harus antara 6 hingga 128 karakter' });
+    }
+  }
 
   try {
     const user = await database.get('SELECT * FROM users WHERE id = ?', [id]);
@@ -274,12 +338,16 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, requireUserMgmtWritab
       return res.status(404).json({ message: 'User tidak ditemukan' });
     }
 
+    const nextActive = is_active !== undefined
+      ? (is_active === true || is_active === 1 || is_active === '1' || is_active === 'true' ? 1 : 0)
+      : user.is_active;
+
     // Protection for Primary Admin
     if (user.is_primary_admin === 1) {
       if (role && role !== 'admin') {
         return res.status(400).json({ message: 'Akun Administrator utama harus tetap memiliki role Admin' });
       }
-      if (is_active === 0 || is_active === false) {
+      if (nextActive === 0) {
         return res.status(400).json({ message: 'Akun Administrator utama tidak dapat dinonaktifkan' });
       }
     }
@@ -309,12 +377,12 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, requireUserMgmtWritab
 
     const nextRole = role === 'admin' ? 'admin' : (role === 'user' ? 'user' : user.role);
     const roleRow = await database.get('SELECT id FROM roles WHERE name = ?', [nextRole]);
-    const nextActive = is_active !== undefined ? (is_active ? 1 : 0) : user.is_active;
 
     let query = 'UPDATE users SET email = ?, role = ?, role_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
     let params = [cleanEmail, nextRole, roleRow ? roleRow.id : user.role_id, nextActive, id];
 
-    if (password && password.trim() !== '') {
+    const passwordChanged = Boolean(password && typeof password === 'string' && password.trim() !== '');
+    if (passwordChanged) {
       const rounds = envConfig.bcrypt_rounds || 10;
       const hashedPassword = await bcrypt.hash(password, rounds);
       query = 'UPDATE users SET email = ?, password = ?, role = ?, role_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
@@ -322,6 +390,12 @@ app.put('/api/users/:id', authenticateToken, requireAdmin, requireUserMgmtWritab
     }
 
     await database.run(query, params);
+    if (nextActive === 0 || passwordChanged) {
+      await database.run(
+        'UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND revoked_at IS NULL',
+        [id]
+      );
+    }
     res.json({ message: 'User berhasil diperbarui' });
   } catch (err) {
     console.error(err);
@@ -620,9 +694,12 @@ app.get('/api/transactions', authenticateToken, async (req, res) => {
       ORDER BY t.created_at DESC
     `;
     const params = [];
-    if (limit) {
-      query += ' LIMIT ?';
-      params.push(parseInt(limit, 10));
+    if (limit !== undefined && limit !== '') {
+      const parsedLimit = parseInt(String(limit), 10);
+      if (Number.isFinite(parsedLimit) && parsedLimit > 0) {
+        query += ' LIMIT ?';
+        params.push(Math.min(parsedLimit, 1000));
+      }
     }
     const txs = await database.all(query, params);
     res.json(txs);
@@ -693,17 +770,28 @@ async function authenticateApiKey(req, res, next) {
   }
 }
 
-app.post('/api/v1/charge', authenticateApiKey, async (req, res) => {
-  const { external_id, amount, webhook_url } = req.body;
+app.post('/api/v1/charge', chargeRateLimiter, authenticateApiKey, async (req, res) => {
+  const { external_id, amount, webhook_url } = req.body || {};
 
-  if (!external_id || !amount) {
-    return res.status(400).json({ status: 'error', message: 'external_id dan amount wajib diisi' });
+  if (typeof external_id !== 'string' || !external_id.trim() || external_id.trim().length > 128) {
+    return res.status(400).json({ status: 'error', message: 'external_id wajib diisi (string, maksimal 128 karakter)' });
+  }
+  const cleanExternalId = external_id.trim();
+
+  if (amount === undefined || amount === null || amount === '' || typeof amount === 'boolean') {
+    return res.status(400).json({ status: 'error', message: 'amount wajib diisi' });
   }
 
-  const baseAmt = parseFloat(amount);
-  if (!Number.isFinite(baseAmt) || baseAmt <= 0) {
-    return res.status(400).json({ status: 'error', message: 'amount harus bernilai positif' });
+  const baseAmt = Number(amount);
+  if (!Number.isFinite(baseAmt) || baseAmt <= 0 || baseAmt > 1000000000) {
+    return res.status(400).json({ status: 'error', message: 'amount harus bernilai angka positif yang valid' });
   }
+
+  const webhookCheck = validateWebhookUrl(webhook_url);
+  if (!webhookCheck.valid) {
+    return res.status(400).json({ status: 'error', message: webhookCheck.reason });
+  }
+  const cleanWebhookUrl = webhookCheck.url;
 
   envConfig = getEnvConfig();
   const staticQris = req.merchant.static_qris || envConfig.static_qris;
@@ -743,13 +831,13 @@ app.post('/api/v1/charge', authenticateApiKey, async (req, res) => {
 
     const result = await database.run(
       'INSERT INTO transactions (merchant_id, external_id, amount, status, qris_string, qris_image, webhook_url, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.merchant.id, external_id, finalAmt, 'pending', dynamicQrisStr, qrCodeImage, webhook_url || null, 'qris']
+      [req.merchant.id, cleanExternalId, finalAmt, 'pending', dynamicQrisStr, qrCodeImage, cleanWebhookUrl, 'qris']
     );
 
     res.status(201).json({
       status: 'pending',
       transaction_id: result.id,
-      external_id: external_id,
+      external_id: cleanExternalId,
       amount: finalAmt,
       base_amount: baseAmt,
       fee: suffix,
@@ -797,9 +885,13 @@ app.get('/api/v1/status/:external_id', authenticateApiKey, async (req, res) => {
 const webhookLogs = [];
 
 app.post('/api/test-webhook', (req, res) => {
+  const sanitizedHeaders = { ...req.headers };
+  delete sanitizedHeaders.authorization;
+  delete sanitizedHeaders.cookie;
+  delete sanitizedHeaders['x-api-key'];
   webhookLogs.unshift({
     timestamp: new Date().toISOString(),
-    headers: req.headers,
+    headers: sanitizedHeaders,
     body: req.body
   });
   if (webhookLogs.length > 50) webhookLogs.pop();

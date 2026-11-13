@@ -1,4 +1,17 @@
 const { Client } = require('ssh2');
+const { loadDotEnv } = require('./backend/config/env');
+
+loadDotEnv();
+
+const host = process.env.SSH_HOST;
+const port = parseInt(process.env.SSH_PORT || '22', 10);
+const username = process.env.SSH_USER || 'root';
+const password = process.env.SSH_PASSWORD;
+
+if (!host || !password) {
+  console.error('[Error] Set SSH_HOST and SSH_PASSWORD in .env or environment variables.');
+  process.exit(1);
+}
 
 const conn = new Client();
 
@@ -17,21 +30,21 @@ conn.on('ready', () => {
       conn.end();
       return;
     }
-    
+
     let stdout = '';
     stream.on('data', (data) => {
       stdout += data.toString();
     });
-    
+
     stream.on('close', () => {
       console.log(stdout);
       conn.end();
     });
   });
 }).connect({
-  host: '168.144.39.71',
-  port: 22,
-  username: 'root',
-  password: '!*711Maxwin',
+  host,
+  port,
+  username,
+  password,
   readyTimeout: 10000
 });

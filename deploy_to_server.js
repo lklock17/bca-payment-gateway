@@ -1,12 +1,24 @@
 const { Client } = require('ssh2');
-const fs = require('fs');
 const path = require('path');
+const { loadDotEnv } = require('./backend/config/env');
+
+loadDotEnv();
+
+const host = process.env.SSH_HOST;
+const port = parseInt(process.env.SSH_PORT || '22', 10);
+const username = process.env.SSH_USER || 'root';
+const password = process.env.SSH_PASSWORD;
+
+if (!host || !password) {
+  console.error('[Error] Set SSH_HOST and SSH_PASSWORD in .env or environment variables.');
+  process.exit(1);
+}
 
 const conn = new Client();
 
 conn.on('ready', () => {
-  console.log('[SSH] Connected to 168.144.39.71 for deployment...');
-  
+  console.log(`[SSH] Connected to ${host} for deployment...`);
+
   conn.sftp((err, sftp) => {
     if (err) {
       console.error('[SFTP] Error:', err);
@@ -31,8 +43,6 @@ conn.on('ready', () => {
     function uploadNext() {
       if (uploadIndex >= filesToUpload.length) {
         console.log('[SFTP] All files uploaded successfully.');
-        
-        // Now restart PM2 on the server
         console.log('[SSH] Restarting bca-gateway process on server...');
         conn.exec('pm2 restart bca-gateway && sleep 5 && pm2 status && tail -n 30 /root/.pm2/logs/bca-gateway-out.log', (execErr, stream) => {
           if (execErr) {
@@ -41,7 +51,7 @@ conn.on('ready', () => {
             return;
           }
 
-          stream.on('close', (code, signal) => {
+          stream.on('close', (code) => {
             console.log(`[SSH] Commands completed with code ${code}.`);
             conn.end();
           });
@@ -78,9 +88,9 @@ conn.on('ready', () => {
 }).on('error', (err) => {
   console.error('[SSH] Connection error:', err);
 }).connect({
-  host: '168.144.39.71',
-  port: 22,
-  username: 'root',
-  password: '!*711Maxwin',
+  host,
+  port,
+  username,
+  password,
   readyTimeout: 30000
 });

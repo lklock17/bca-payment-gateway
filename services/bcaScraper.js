@@ -113,9 +113,11 @@ class BcaSession {
       if (closeBtn) closeBtn.click();
     }).catch(() => {});
 
-    try {
-      await this.page.screenshot({ path: 'public/screenshot-1-login.png' });
-    } catch(e) {}
+    if (process.env.DEBUG_SCREENSHOTS === 'true') {
+      try {
+        await this.page.screenshot({ path: 'logs/screenshot-1-login.png' });
+      } catch(e) {}
+    }
 
     // Click submit via evaluate
     console.log('[Scraper] Submitting Login form...');
@@ -261,9 +263,11 @@ class BcaSession {
     // Wait for data load
     await new Promise(r => setTimeout(r, 3000));
 
-    try {
-      await this.page.screenshot({ path: 'public/screenshot-3-final.png' });
-    } catch(e) {}
+    if (process.env.DEBUG_SCREENSHOTS === 'true') {
+      try {
+        await this.page.screenshot({ path: 'logs/screenshot-3-final.png' });
+      } catch(e) {}
+    }
 
     // 5. Extract transaction rows (Modern Angular .transaction-details + fallback table layout)
     const transactions = await this.page.evaluate(() => {

@@ -262,7 +262,13 @@ async function generateQRISImage(qrisStr) {
     }
 
     const tags = parseQRIS(qrisStr);
-    const merchantName = tags['59'] || 'Hobbycloud RC';
+    const rawMerchantName = String(tags['59'] || 'Hobbycloud RC');
+    const merchantName = rawMerchantName
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
 
     const htmlContent = `
 <!DOCTYPE html>

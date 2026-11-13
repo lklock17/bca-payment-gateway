@@ -54,8 +54,11 @@ function createAuthHelpers({ database, jwtSecret, jwtExpiresHours = 24 }) {
 
       const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
       const nowSec = Math.floor(Date.now() / 1000);
-      if (payload.exp && nowSec >= payload.exp) {
+      if (typeof payload.exp !== 'number' || !Number.isFinite(payload.exp) || nowSec >= payload.exp) {
         return res.status(401).json({ message: 'Sesi telah kedaluwarsa. Silakan login kembali.' });
+      }
+      if (typeof payload.jti !== 'string' || !payload.jti) {
+        return res.status(401).json({ message: 'Token tidak valid (missing jti).' });
       }
 
       const dbUser = await database.get(
@@ -69,14 +72,12 @@ function createAuthHelpers({ database, jwtSecret, jwtExpiresHours = 24 }) {
         return res.status(401).json({ message: 'Akun Anda telah dinonaktifkan' });
       }
 
-      if (payload.jti) {
-        const session = await database.get(
-          'SELECT id, revoked_at FROM sessions WHERE token_jti = ? AND user_id = ?',
-          [payload.jti, dbUser.id]
-        );
-        if (session && session.revoked_at) {
-          return res.status(401).json({ message: 'Sesi telah dicabut. Silakan login kembali.' });
-        }
+      const session = await database.get(
+        'SELECT id, revoked_at, expires_at FROM sessions WHERE token_jti = ? AND user_id = ?',
+        [payload.jti, dbUser.id]
+      );
+      if (!session || session.revoked_at) {
+        return res.status(401).json({ message: 'Sesi telah dicabut atau tidak valid. Silakan login kembali.' });
       }
 
       req.user = {

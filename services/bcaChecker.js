@@ -1,7 +1,9 @@
+const crypto = require('crypto');
 const database = require('../database');
 const bcaScraper = require('./bcaScraper');
 const qrisUtil = require('../utils/qris');
 const { updateDotEnvStaticQris } = require('../backend/config/env');
+const { validateWebhookUrl } = require('../backend/utils/security');
 
 /**
  * Dispatches a webhook notification to the merchant's endpoint.
@@ -13,6 +15,12 @@ async function dispatchWebhook(transaction) {
     return;
   }
 
+  const urlCheck = validateWebhookUrl(transaction.webhook_url);
+  if (!urlCheck.valid || !urlCheck.url) {
+    console.warn(`[Webhook] Blocked unsafe webhook URL for Tx ${transaction.id}: ${urlCheck.reason || 'invalid URL'}`);
+    return false;
+  }
+
   const payload = {
     transaction_id: transaction.id,
     external_id: transaction.external_id,
@@ -21,21 +29,27 @@ async function dispatchWebhook(transaction) {
     updated_at: new Date().toISOString()
   };
 
-  console.log(`[Webhook] Sending payment notification for Tx ${transaction.id} to ${transaction.webhook_url}...`);
+  const payloadStr = JSON.stringify(payload);
+  const webhookSecret = process.env.WEBHOOK_SECRET || process.env.JWT_SECRET || 'bca-gateway-webhook';
+  const signature = crypto.createHmac('sha256', webhookSecret).update(payloadStr).digest('hex');
+
+  console.log(`[Webhook] Sending payment notification for Tx ${transaction.id} to ${urlCheck.url}...`);
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const response = await fetch(transaction.webhook_url, {
+      const response = await fetch(urlCheck.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Payment-Signature': 'sha256-signature-placeholder' // Signature header for security
+          'X-Payment-Signature': `sha256=${signature}`
         },
-        body: JSON.stringify(payload)
+        body: payloadStr,
+        redirect: 'manual',
+        signal: AbortSignal.timeout(10000)
       });
 
       if (response.ok) {
-        console.log(`[Webhook] Webhook dispatched successfully to ${transaction.webhook_url} (Attempt ${attempt})`);
+        console.log(`[Webhook] Webhook dispatched successfully to ${urlCheck.url} (Attempt ${attempt})`);
         return true;
       } else {
         console.warn(`[Webhook] Receiver returned status ${response.status} (Attempt ${attempt}/3)`);
